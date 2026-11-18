@@ -1,0 +1,381 @@
+# ---------------------------------------------------------------------------
+# Language file: English
+#
+# Format: key=value
+#   - Lines starting with # are comments.
+#   - A line starting with + continues the previous key's value.
+#   - {name} placeholders are replaced when the text is rendered.
+#
+# To add a language, copy this file as locales/<code>.txt, translate the
+# values and restart the application. The language will appear automatically
+# under File > Language.
+# ---------------------------------------------------------------------------
+
+meta.name=English
+meta.code=en
+
+# Application
+app.title=CAD-CAM 2D CNC - Safe Toolpath Generator
+app.shortTitle=CAD-CAM 2D CNC
+app.windowTitle=CAD-CAM 2D CNC - Safe Toolpath Generator
+
+# Native menu
+menu.file=File
+menu.open=Open DXF file...
+menu.reload=Reload current DXF
+menu.save=Save G-Code (.nc, .gcode)...
+menu.exportReport=Export Safety Report...
+menu.loadExample=Open included example
+menu.language=Language
+menu.exit=Exit
+menu.cam=CAM / Tools
+menu.generate=Generate Safe G-Code
+menu.safety=Verify Toolpath Safety
+menu.fit=Center CAD View
+menu.viewCad=CAD Viewer
+menu.viewGcode=G-Code
+menu.viewSim=CNC Simulator
+menu.help=Help
+menu.guide=Safe Toolpath Guide
+menu.about=About
+menu.openExamples=Open examples folder
+menu.devTools=Developer tools
+
+# Sidebar panels
+panel.file=1. DXF File
+btn.open=📂 Open DXF...
+btn.reloadTitle=Read the current file again
+fileInfo.none=No file loaded
+
+panel.layers=2. Layers and CAM Operations
+panel.layersHint=Assign machining operations per layer:
+layers.empty=No layers with entities.
+layers.toggleTitle=Show or hide layer
+layers.entitiesTitle={name} ({count} entities)
+layers.operationTitle=CAM operation for the layer
+
+panel.tool=3. Tool and Z Safety
+field.toolDiameter=End mill diameter (mm)
+field.safeZ=Safe Z (G0) (mm)
+field.retractZ=Approach Z (mm)
+field.targetDepth=Total depth (mm)
+field.stepdown=Step per pass (mm)
+passes.initial=Calculation: 2 Z passes
+passes.twoD=2D mode: no Z passes (single XY path)
+passes.calcOne=Calculation: 1 Z pass ({values} mm)
+passes.calcMany=Calculation: {count} Z passes ({values} mm)
+passes.one=Calculation: 1 pass
+
+panel.feeds=4. Feeds and Spindle
+field.cutFeed=XY cutting feed (mm/min)
+field.plungeFeed=Z plunge feed (mm/min)
+field.spindleRpm=Spindle speed (RPM)
+
+panel.tabs=5. Holding Tabs
+tabs.enable=Enable part holding tabs
+field.tabCount=Number of tabs
+field.tabWidth=Tab width (mm)
+field.tabHeight=Height above floor (mm)
+
+panel.zero=6. Work Zero and Postprocessor
+field.workZero=Work zero
+field.postProfile=CNC controller
+twoD.label=2D mode: remove the Z axis from the program
+twoD.hint=For oxy-fuel torches that do not lift the Z axis: it omits all Z words, depth passes and holding tabs.
+
+panel.modalCodes=7. Modal Codes
+panel.modalCodesHint=Insert commands before or after each G00 rapid and each G02/G03 arc (for example, to open or close the oxygen).
+btn.modalCodes=⚙ Configure modal codes...
+modalCodes.none=No codes configured.
+modalCodes.summary.configured=Configured: {list}.
+modalCodes.summary.none=No codes configured.
+modalCodes.label.beforeG0=before G00
+modalCodes.label.afterG0=after G00
+modalCodes.label.beforeArc=before G02/G03
+modalCodes.label.afterArc=after G02/G03
+modalCodes.title=Modal codes per movement
+modalCodes.hint=They are inserted verbatim into the generated program: one snippet per line. G00 codes also apply to G0; arc codes apply to G02 and G03. The final return to origin does not trigger codes (so the oxygen is not re-enabled after shutdown). Note: this generator converts arcs into G1 segments, so arc codes only apply when the program contains G02/G03.
+modalCodes.beforeG0=Before G00 (rapid)
+modalCodes.afterG0=After G00 (rapid)
+modalCodes.beforeArc=Before G02 / G03 (arc)
+modalCodes.afterArc=After G02 / G03 (arc)
+modalCodes.placeholder.beforeG0=M5 ; turn oxygen off before the rapid
+modalCodes.placeholder.afterG0=M3 ; turn oxygen on after the rapid
+modalCodes.cancel=Cancel
+modalCodes.apply=Apply
+
+# Main actions
+actions.generate=🚀 GENERATE SAFE G-CODE
+actions.generating=⏳ Generating...
+actions.save=💾 Save CNC Program...
+actions.safety=🛡 Safety Report
+
+# Workspace tabs
+tabs.cad=📐 CAD / CAM Viewer
+tabs.gcode=📝 Generated G-Code
+tabs.sim=🎮 2D CNC Simulator
+
+# CAD viewer
+cad.zoomIn=Zoom in
+cad.zoomOut=Zoom out
+cad.fitTitle=Fit view
+cad.fit=🏠 Fit view
+cad.showToolpaths=Show compensated toolpaths
+cad.coords=X: {x} mm | Y: {y} mm
+cad.coordsStart=X: 0.000 mm | Y: 0.000 mm
+cad.hint=Click “Open DXF...” to load a part.
+cad.width=Width: {value} mm
+cad.height=Height: {value} mm
+cad.zeroLabel=Zero (0,0)
+
+# G-code viewer
+gcode.stats.empty=Generate the G-code to display statistics.
+gcode.copy=📋 Copy
+gcode.saveAs=💾 Save as...
+gcode.placeholder=No program has been generated yet.
+
+# Simulator
+sim.start=▶ Start
+sim.pause=⏸ Pause
+sim.stop=⏹ Stop
+sim.step=⏭ Step
+sim.reset=⟳ Reset
+sim.speed=Speed
+sim.progress=Progress
+sim.telemetryStart=X: 0.000 | Y: 0.000 | Z: 0.000 | T: 0.0s
+sim.hint=Generate the G-code to initialize the simulator.
+sim.blocks=G-Code blocks being executed
+sim.finished=Simulation finished | T: {time}s
+sim.telemetry=X: {x} | Y: {y} | Z: {z} | Step: {step}/{total} | T: {time}s / {totalTime}s
+
+# Status bar and safety
+status.ready=Ready. Open a DXF file to begin.
+status.loaded=DXF loaded: {name} · {count} machinable entities
+status.generated=G-code generated · {blocks} blocks · {status}
+status.generationError=Error while generating G-code.
+status.saved=G-Code saved to {file}
+safety.none=Safety: not calculated
+safety.status=Safety: {status} {icon}
+safety.SEGURO=SAFE
+safety.ADVERTENCIA=WARNING
+safety.PELIGRO=DANGER
+
+# Generic dialogs
+modal.close=Close
+modal.ok=Close
+
+# Dynamic messages
+fileInfo.loaded={name} · {width} × {height} mm · {count} entities
+toast.unsupported=Unsupported entities ignored: {detail}
+toast.reloaded=DXF file reloaded.
+toast.exampleLoaded=Example loaded: ejemplo_pieza.dxf
+toast.noDxf=No DXF file loaded.
+toast.loadError=Could not load the file.
+toast.generateNoDxf=Load a DXF file first.
+toast.generateFirst=Generate the G-code before saving.
+toast.generateFirstReport=Generate the G-code first.
+toast.generateFirstSafety=Generate the G-code to inspect its safety.
+toast.noGcode=There is no G-code to copy.
+toast.generateError=Could not generate the G-code.
+toast.saved=File saved:
++{path}
+toast.saveError=Could not save the file.
+toast.reportExported=Report exported:
++{path}
+toast.reportError=Could not export the report.
+toast.copied=G-code copied to the clipboard.
+toast.modalCodesUpdated=Modal codes updated.
+toast.initError=Error starting the application: {message}
+toast.generated=G-code generated successfully.
++• Safety status: {status}
++{depth}
++• Estimated time: {time} min
+toast.generated2d=• 2D program: no Z axis
+toast.generatedDepth=• Z passes: {passes}
++• Z depth: {depth} mm
+
+# Program statistics
+stats.summary={blocks} blocks · cut {cut} mm · rapid {rapid} mm · {time} min · {mode} · {status}
+stats.mode2d=2D mode without Z axis
+stats.passes={count} passes
+
+# CAM operations
+operation.PERFIL_EXTERIOR=Outer profile +R
+operation.PERFIL_INTERIOR=Inner profile −R
+operation.SOBRE_LINEA=On the line
+operation.CAJEADO=Pocketing
+operation.TALADRADO=Drilling
+operationDesc.PERFIL_EXTERIOR=Offsets the cutter outward (+radius) to preserve the part dimensions
+operationDesc.PERFIL_INTERIOR=Offsets the cutter inward (−radius) for holes and inner windows
+operationDesc.SOBRE_LINEA=Cuts along the vector: engraving, laser or plasma
+operationDesc.CAJEADO=Concentric passes until the pocket is cleared
+operationDesc.TALADRADO=Drilling cycle at the center of circles
+
+# Work zero
+zero.bottom_left=Bottom left
+zero.center=Part center
+zero.top_left=Top left
+zero.drawing_zero=Drawing zero
+
+# Native dialogs
+dialog.openTitle=Select DXF file
+dialog.filterDxf=DXF files
+dialog.filterAll=All files
+dialog.saveTitle=Save G-Code file
+dialog.saveFilterNc=NC files (*.nc)
+dialog.saveFilterGcode=G-Code files (*.gcode)
+dialog.saveFilterTap=TAP files (*.tap)
+dialog.saveFilterTxt=Text files (*.txt)
+dialog.reportTitle=Export safety report
+dialog.reportFilter=Text (*.txt)
+
+# Main-process errors
+error.dxfEntities=The DXF file does not contain machinable 2D entities (LINE, ARC, CIRCLE, LWPOLYLINE, POLYLINE, SPLINE or ELLIPSE).
+error.dxfOpen=Could not load the DXF file:
++{message}
+error.dxfReloadNone=No DXF file loaded.
+error.dxfReload=Could not reload the DXF file:
++{message}
+error.exampleMissing=The example file is not available.
+error.exampleLoad=Could not load the example:
++{message}
+error.noDxf=Load a DXF file first.
+error.noEntities=There are no active entities or visible layers to machine.
+error.generate=Could not generate the G-code:
++{message}
+error.saveNoGcode=Generate the G-code before saving.
+error.save=Could not save the file:
++{message}
+error.exportNoGcode=Generate the G-code first.
+error.export=Could not export the report.
+
+# Safety report
+safety.report.title=== CNC SAFETY REPORT ===
+safety.report.windowTitle=CNC safety verification report
+safety.report.status=Overall status: {status}
+safety.report.mode=Machining mode: {mode}
+safety.report.mode2d=2D (no Z axis)
+safety.report.mode25d=2.5D (with Z axis)
+safety.report.moves=G0 rapid moves: {rapid} | Cutting moves: {cut}
+safety.report.ok2d=[OK] 2D program: no Z moves or retractions are emitted.
+safety.report.zsafe=Configured safe Z: {safe} mm | Maximum Z reached: {max} mm
+safety.report.ztarget=Target Z: {target} mm | Minimum Z reached: {min} mm
+safety.report.allOk=[OK] All collision and dimension checks passed successfully.
+safety.report.errors=CRITICAL ERRORS:
+safety.report.warnings=WARNINGS:
+safety.rule.rapidXY=Line {line}: G0 rapid move in XY at Z={z}mm (below safe Z {safe}mm). Collision risk.
+safety.rule.cutNoSpindle=Line {line}: Cutting at Z={z}mm without a previous M3 command or with the spindle off.
+safety.rule.plungeFeed=Line {line}: Z plunge at feed F{feed} above the safe limit ({limit} mm/min).
+safety.rule.cutNoSpindle2d=Line {line}: Cutting without a previous M3 command or with the torch off.
+safety.rule.depth=Minimum depth reached ({min}mm) exceeds the target depth ({target}mm).
+safety.rule.noM5=The program does not include an M5 command to stop the spindle at the end.
+safety.rule.notRetracted=The program does not end with the tool retracted to safe Z ({safe}mm).
+
+# Generated G-code comments
+gcode.error.noEntities=There are no active entities or visible layers to machine.
+gcode.header.program=Program: {name}
+gcode.header.postprocessor=Postprocessor: {profile}
+gcode.header.tool=Tool: D={diameter}mm
+gcode.header.mode2d=2D mode active: program without Z axis (fixed torch)
+gcode.header.totalDepth=Total Depth: {depth}mm
+gcode.header.cutFeed=Cutting Feed: {feed} mm/min
+gcode.header.plungeFeed=Plunge Feed: {feed} mm/min
+gcode.header.unitsMm=Units in millimeters (mm)
+gcode.header.absolute=Absolute coordinates
+gcode.header.planeXY=XY work plane
+gcode.header.initialSafe=Initial safe position
+gcode.header.spindleOn=Turn spindle on clockwise
+gcode.header.dwell=Wait to reach RPM
+gcode.header.coolantOn=Coolant on
+gcode.header.toolChange=Change to tool 1
+gcode.header.continuous=Continuous toolpath control
+gcode.header.mm=mm
+gcode.header.absoluteShort=absolute
+gcode.header.laserOff=Laser off for safe start
+gcode.comment.contour=Contour {index}/{total} - Layer: '{layer}'
+gcode.comment.operation=Operation: {operation} | Nesting Level: {nesting}
+gcode.comment.drillPoint2d=Drill point (2D mode)
+gcode.comment.ensureClearance=Ensure clearance height
+gcode.comment.positioningXY=XY positioning
+gcode.comment.cut2d=2D cutting path (no Z axis)
+gcode.comment.torchOn=Turn torch / laser on
+gcode.comment.torchOff=Turn torch / laser off
+gcode.comment.approach=Rapid approach
+gcode.comment.pass=Pass {index}/{total} at Z = {z} mm
+gcode.comment.plunge=Controlled plunge
+gcode.comment.tab=Holding tab
+gcode.comment.tabReturn=Return to cut
+gcode.comment.safeRetract=Safe retraction
+gcode.footer.finish=End of machining operations
+gcode.footer.retract=Mandatory retraction to safe Z
+gcode.footer.coolantOff=Coolant off
+gcode.footer.spindleOff=Spindle / torch off
+gcode.footer.returnHome=Return to part origin
+gcode.footer.end=End of CNC program
+
+# Built-in help
+help.title=Safe toolpath guide
+help.text=SAFE CNC 2D TOOLPATH GUIDE
++
++1. Z safety planes
++   • Safe Z (Clearance): height at which all G0 rapid moves are performed.
++     It avoids clamps, screws and fixtures.
++   • Approach Z (Retract): intermediate height before plunging at a
++     controlled feed.
++
++2. Inside-First rule
++   • The program detects inner holes and pockets and machines them BEFORE
++     the outer perimeter. If the outside is cut first, the part comes loose
++     and may cause a collision.
++
++3. Multiple passes
++   • The total depth is divided into even layers that never exceed the
++     stepdown, protecting the cutter.
++
++4. Holding tabs
++   • They leave small material bridges on the last pass so the part does not
++     fly off when the cut finishes.
++
++5. Cutter radius compensation
++   • Outer profile: offsets the cutter outward (+R).
++   • Inner profile: offsets the cutter inward (-R).
++   • On the line: cuts directly along the vector (engraving, laser, plasma).
++
++6. Automatic checks before cutting
++   • No G0 move in XY below safe Z.
++   • Spindle on (M3) before touching material.
++   • Z plunge at a controlled feed.
++   • Minimum depth within the programmed value.
++   • Final retraction and shutdown (M5).
++
++7. 2D mode (no Z axis)
++   • Removes every Z word from the program: no passes, no retractions and
++     no holding tabs.
++   • Intended for oxy-fuel torches that do not lift the Z axis and only turn
++     the oxygen off during rapids.
++   • Drilling becomes a simple punch point.
++
++8. Modal codes
++   • They insert custom commands before and after each G00 and each G02/G03,
++     for example to open or close the oxygen.
++   • Snippets are inserted without being reinterpreted, so they may contain
++     several M commands or even movements.
+
+# About
+about.title=About
+about.text=CAD-CAM 2D CNC · Safe toolpath generator
++Version {version}
++
++Cross-platform CAD-CAM suite built with Electron.
++Imports DXF (lines, arcs, circles, polylines with bulges, splines and
++ellipses), generates G-code with tool compensation, multiple passes,
++holding tabs and pre-flight safety verification.
++
++Compatible with GRBL, Candle, CNCjs, UGS, Mach3/4, LinuxCNC, Marlin and
++2D laser/plasma.
++
++Electron {electron} · Platform {platform}
+
+# Suggested file names in the save dialogs
+file.programName=program.nc
+file.reportName=safety_report.txt

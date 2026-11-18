@@ -77,6 +77,10 @@ const DEFAULT_PARAMS = {
   customZeroX: 0.0,
   customZeroY: 0.0,
 
+  // Modo 2D: genera únicamente movimientos XY y omite cualquier palabra Z.
+  // Pensado para antorchas que no levantan el eje Z.
+  twoDMode: false,
+
   tabsEnabled: true,
   tabCount: 4,
   tabWidth: 4.0,

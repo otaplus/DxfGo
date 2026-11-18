@@ -19,6 +19,9 @@ const { CAMEngine, CAMParameters } = require('../src/shared/cam-engine');
 const { PostProcessor } = require('../src/shared/postprocessor');
 const { SafetyChecker } = require('../src/shared/safety-check');
 const { ringArea } = require('../src/shared/polygon-ops');
+const {
+  injectModalCodes, sanitizeModalCodes, isRapid, isArc,
+} = require('../src/shared/gcode-injector');
 
 const PROJECT_ROOT = path.join(__dirname, '..');
 const TMP_DIR = path.join(PROJECT_ROOT, '.cache', 'test-tmp');
@@ -604,4 +607,120 @@ test('Seguridad: el programa de ejemplo queda en SEGURO', () => {
   ok(report.status === 'SEGURO', `estado: ${report.status}`);
   ok(report.errors.length === 0, 'sin errores');
   ok(report.warnings.length === 0, 'sin advertencias');
+});
+
+// ---------------------------------------------------------------------------
+// Modo 2D (sin eje Z) y códigos modales
+// ---------------------------------------------------------------------------
+
+test('Modo 2D: el programa no contiene ninguna coordenada Z', () => {
+  const { gcode } = exampleGcode({ twoDMode: true, tabsEnabled: true });
+  ok(!/\bZ[-+]?\d/.test(gcode), 'no debe haber palabras Z en el programa');
+  excludes(gcode, 'Pestaña (Tab)', 'las pestañas requieren eje Z');
+  excludes(gcode, 'Retracción segura');
+});
+
+test('Modo 2D: una sola pasada y seguridad SEGURO', () => {
+  const { gcode, params, engine } = exampleGcode({ twoDMode: true });
+  ok(engine.stats.numPasses === 1, `pasadas: ${engine.stats.numPasses}`);
+  ok(engine.stats.twoDMode === true, 'las estadísticas indican modo 2D');
+
+  const report = SafetyChecker.verifyGcode(
+    gcode, params.safeZ, params.targetDepth, params.plungeFeed, { twoDMode: true },
+  );
+  ok(report.status === 'SEGURO', `estado: ${report.status} (${report.warnings.join('; ')})`);
+  includes(report.reportText, 'Modo de mecanizado: 2D');
+});
+
+test('Modo 2D: el taladrado se convierte en un punto de perforación', () => {
+  const dxf = builder.buildDxf([builder.circle('TALADROS', 25, 35, 3)]);
+  const { loader } = loadFromText(dxf);
+  const engine = new CAMEngine(new CAMParameters({ twoDMode: true }));
+  const gcode = engine.generateGcode(loader.entities, loader.bounds, {
+    TALADROS: { visible: true, operation: 'TALADRADO' },
+  });
+
+  includes(gcode, 'G0 X3.000 Y3.000', 'se posiciona en el centro del taladro');
+  includes(gcode, 'Punto de perforación (modo 2D)');
+  ok(!/\bZ[-+]?\d/.test(gcode), 'el taladrado 2D no usa Z');
+});
+
+test('Códigos modales: se insertan antes y después de G00 y de los arcos', () => {
+  const gcode = [
+    'G0 X0 Y0',
+    'G1 X10 Y0',
+    'G2 X10 Y10 I0 J5',
+    'G03 X0 Y10 I-5 J0',
+    'G00 X0 Y0',
+  ].join('\n');
+
+  const result = injectModalCodes(gcode, {
+    beforeG0: 'M5 ; oxigeno off',
+    afterG0: 'M3 ; oxigeno on',
+    beforeArc: 'M7',
+    afterArc: 'M9',
+  });
+
+  const expected = [
+    'M5 ; oxigeno off',
+    'G0 X0 Y0',
+    'M3 ; oxigeno on',
+    'G1 X10 Y0',
+    'M7',
+    'G2 X10 Y10 I0 J5',
+    'M9',
+    'M7',
+    'G03 X0 Y10 I-5 J0',
+    'M9',
+    'M5 ; oxigeno off',
+    'G00 X0 Y0',
+    'M3 ; oxigeno on',
+  ];
+  ok(result === expected.join('\n'), `resultado inesperado:\n${result}`);
+});
+
+test('Códigos modales: no se reinterpretan comentarios ni los propios fragmentos', () => {
+  const result = injectModalCodes('; G0 no es un movimiento\nG0 X1 Y1', {
+    beforeG0: 'G1 X0 Y0',
+    afterG0: '',
+    beforeArc: '',
+    afterArc: '',
+  });
+  const lines = result.split('\n');
+  ok(lines[0] === '; G0 no es un movimiento', 'el comentario no se modifica');
+  ok(lines[1] === 'G1 X0 Y0', 'el fragmento se inserta tal cual');
+  ok(lines.length === 3, `líneas: ${lines.length}`);
+});
+
+test('Códigos modales: se normalizan saltos de línea y se reconocen los comandos', () => {
+  const codes = sanitizeModalCodes({ beforeG0: '  M5  \r\n\r\nM8\r\n', afterG0: '   ' });
+  ok(codes.beforeG0 === '  M5\nM8', `fragmento: ${JSON.stringify(codes.beforeG0)}`);
+  ok(codes.afterG0 === '', 'los fragmentos vacíos se descartan');
+  ok(isRapid('G0 X1'), 'G0 es rápido');
+  ok(isRapid('G00 X1'), 'G00 es rápido');
+  ok(!isRapid('G17'), 'G17 no es un rápido');
+  ok(isArc('G2 X1 Y1 I0 J1'), 'G2 es arco');
+  ok(isArc('G03 X1 Y1 I0 J1'), 'G03 es arco');
+  ok(!isArc('G30'), 'G30 no es un arco');
+});
+
+test('Códigos modales: el pie de programa no reactiva la antorcha', () => {
+  const gcode = [
+    'G0 X0 Y0',
+    'G1 X10 Y0',
+    '; Fin de operaciones de mecanizado',
+    'M5 ; Apagar husillo',
+    'G0 X0 Y0 ; Retorno a origen',
+    'M30',
+  ].join('\n');
+
+  const result = injectModalCodes(gcode, {
+    beforeG0: 'M5', afterG0: 'M3', beforeArc: '', afterArc: '',
+  });
+  const lines = result.split('\n');
+  ok(lines.indexOf('M5') >= 0 && lines[lines.indexOf('M5') + 1] === 'G0 X0 Y0', 'el primer rápido sí se procesa');
+  ok(lines.filter((line) => line === 'M3').length === 1, 'solo se reactiva una vez, en el cuerpo');
+  ok(lines[lines.length - 1] === 'M30', 'el programa termina en M30');
+  ok(lines[lines.length - 2] === 'G0 X0 Y0 ; Retorno a origen',
+    'el retorno final no reactiva la antorcha');
 });

@@ -3,109 +3,139 @@
 /**
  * Menú nativo de la aplicación. Cada comando envía una acción al renderer, que
  * es el único que conoce el estado de la interfaz.
+ *
+ * El menú se reconstruye al cambiar de idioma para que sus etiquetas y la lista
+ * de idiomas disponibles queden siempre actualizadas.
  */
 
 const { Menu, app } = require('electron');
+const { translate, DEFAULT_LANGUAGE } = require('../shared/locales');
 
 /**
  * @param {import('electron').BrowserWindow} win
+ * @param {{
+ *   language?: string,
+ *   languages?: Array<{code:string,name:string}>,
+ *   onSelectLanguage?: (code:string) => void,
+ * }} [options]
  * @returns {Electron.Menu}
  */
-function buildMenu(win) {
+function buildMenu(win, options = {}) {
+  const language = options.language || DEFAULT_LANGUAGE;
+  const t = typeof options.t === 'function'
+    ? options.t
+    : (key) => translate(language, key);
+  const languages = Array.isArray(options.languages) && options.languages.length
+    ? options.languages
+    : [{ code: DEFAULT_LANGUAGE, name: 'Español' }];
+  const onSelectLanguage = typeof options.onSelectLanguage === 'function'
+    ? options.onSelectLanguage
+    : () => {};
+
   const send = (action) => {
     if (win && !win.isDestroyed()) win.webContents.send('menu:action', action);
   };
 
   const template = [
     {
-      label: 'Archivo',
+      label: t('menu.file'),
       submenu: [
         {
-          label: 'Abrir archivo DXF...',
+          label: t('menu.open'),
           accelerator: 'CmdOrCtrl+O',
           click: () => send('open-dxf'),
         },
         {
-          label: 'Recargar DXF actual',
+          label: t('menu.reload'),
           accelerator: 'CmdOrCtrl+R',
           click: () => send('reload-dxf'),
         },
         { type: 'separator' },
         {
-          label: 'Guardar Código G (.nc, .gcode)...',
+          label: t('menu.save'),
           accelerator: 'CmdOrCtrl+S',
           click: () => send('save-gcode'),
         },
         {
-          label: 'Exportar Informe de Seguridad...',
+          label: t('menu.exportReport'),
           accelerator: 'CmdOrCtrl+Shift+S',
           click: () => send('export-report'),
         },
         { type: 'separator' },
         {
-          label: 'Abrir ejemplo incluido',
+          label: t('menu.loadExample'),
           click: () => send('load-example'),
         },
         { type: 'separator' },
-        { label: 'Salir', role: 'quit' },
+        {
+          label: t('menu.language'),
+          submenu: languages.map((entry) => ({
+            label: entry.name,
+            type: 'radio',
+            checked: entry.code === language,
+            click: () => onSelectLanguage(entry.code),
+          })),
+        },
+        { type: 'separator' },
+        { label: t('menu.exit'), role: 'quit' },
       ],
     },
     {
-      label: 'CAM / Herramientas',
+      label: t('menu.cam'),
       submenu: [
         {
-          label: 'Generar Código G Seguro',
+          label: t('menu.generate'),
           accelerator: 'F5',
           click: () => send('generate'),
         },
         {
-          label: 'Verificar Seguridad de Trayectorias',
+          label: t('menu.safety'),
           accelerator: 'F6',
           click: () => send('show-safety'),
         },
         { type: 'separator' },
         {
-          label: 'Centrar Vista CAD',
+          label: t('menu.fit'),
           accelerator: 'CmdOrCtrl+0',
           click: () => send('fit-cad'),
         },
         { type: 'separator' },
         {
-          label: 'Visor CAD',
+          label: t('menu.viewCad'),
           accelerator: 'CmdOrCtrl+1',
           click: () => send('tab-cad'),
         },
         {
-          label: 'Código G',
+          label: t('menu.viewGcode'),
           accelerator: 'CmdOrCtrl+2',
           click: () => send('tab-gcode'),
         },
         {
-          label: 'Simulador CNC',
+          label: t('menu.viewSim'),
           accelerator: 'CmdOrCtrl+3',
           click: () => send('tab-sim'),
         },
       ],
     },
     {
-      label: 'Ayuda',
+      label: t('menu.help'),
       submenu: [
         {
-          label: 'Guía de Trayectorias Seguras',
+          label: t('menu.guide'),
           accelerator: 'F1',
           click: () => send('show-help'),
         },
         {
-          label: 'Acerca de',
+          label: t('menu.about'),
           click: () => send('show-about'),
         },
         { type: 'separator' },
         {
-          label: 'Abrir carpeta de ejemplos',
+          label: t('menu.openExamples'),
           click: () => send('open-examples'),
         },
         {
-          label: 'Herramientas de desarrollo',
+          label: t('menu.devTools'),
           accelerator: 'CmdOrCtrl+Shift+I',
           click: () => {
             if (win && !win.isDestroyed()) win.webContents.toggleDevTools();

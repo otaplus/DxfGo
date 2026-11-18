@@ -20,15 +20,45 @@ const { GeometryProcessor } = require('../src/shared/geometry');
 const { CAMEngine, CAMParameters } = require('../src/shared/cam-engine');
 const { SafetyChecker } = require('../src/shared/safety-check');
 const {
-  DEFAULT_PARAMS, OPERATIONS, OPERATION_LABELS, POST_PROFILES, ZERO_MODES,
+  DEFAULT_PARAMS, OPERATIONS, OPERATION_LABELS, OPERATION_DESCRIPTIONS,
+  POST_PROFILES, ZERO_MODES,
 } = require('../src/shared/constants');
+const { loadLocales, translate } = require('../src/shared/locales');
+
+/** Diccionarios reales del proyecto, para probar el cambio de idioma. */
+const LANGUAGES = loadLocales(path.join(__dirname, '..'));
+const LANGUAGE_LIST = LANGUAGES.map(({ code, name }) => ({ code, name }));
+
+/** Catálogos localizados equivalentes a los que envía el proceso principal. */
+function catalogsFor(code) {
+  const messages = (LANGUAGES.find((language) => language.code === code) || {}).messages || {};
+  const operationLabels = {};
+  const operationDescriptions = {};
+  for (const operation of OPERATIONS) {
+    operationLabels[operation] = translate(code, `operation.${operation}`, {}, messages);
+    operationDescriptions[operation] = translate(code, `operationDesc.${operation}`, {}, messages);
+  }
+  return {
+    operationLabels,
+    operationDescriptions,
+    zeroModes: ZERO_MODES.map((mode) => ({
+      value: mode.value,
+      label: translate(code, `zero.${mode.value}`, {}, messages),
+    })),
+  };
+}
+
+function messagesFor(code) {
+  const language = LANGUAGES.find((entry) => entry.code === code);
+  return language ? language.messages : {};
+}
 
 const PROJECT_ROOT = path.join(__dirname, '..');
 const RENDERER_DIR = path.join(PROJECT_ROOT, 'src', 'renderer');
 const INDEX_HTML = path.join(RENDERER_DIR, 'index.html');
 const EXAMPLE_DXF = path.join(PROJECT_ROOT, 'examples', 'ejemplo_pieza.dxf');
 
-const RENDERER_SCRIPTS = ['util.js', 'cad-view.js', 'sim-view.js', 'app.js'];
+const RENDERER_SCRIPTS = ['i18n.js', 'util.js', 'cad-view.js', 'sim-view.js', 'app.js'];
 
 // ---------------------------------------------------------------------------
 // Contexto 2D falso
@@ -119,6 +149,7 @@ function createFakeApi() {
 
   const calls = [];
   let menuHandler = null;
+  let languageHandler = null;
 
   const initialLayerConfigs = () => {
     const configs = {};
@@ -132,8 +163,13 @@ function createFakeApi() {
     calls,
     getMenuHandler: () => menuHandler,
 
+    getLanguageHandler: () => languageHandler,
+
     info: async () => ({
       version: '3.0.0',
+      language: 'es',
+      messages: messagesFor('es'),
+      languages: LANGUAGE_LIST,
       electron: 'test',
       chrome: 'test',
       node: 'test',
@@ -213,6 +249,19 @@ function createFakeApi() {
     onMenuAction: (callback) => {
       menuHandler = callback;
       return () => { menuHandler = null; };
+    },
+
+    setLanguage: async (code) => ({
+      ok: true,
+      language: code,
+      messages: messagesFor(code),
+      languages: LANGUAGE_LIST,
+      ...catalogsFor(code),
+    }),
+
+    onLanguageChange: (callback) => {
+      languageHandler = callback;
+      return () => { languageHandler = null; };
     },
   };
 
@@ -614,6 +663,106 @@ test('Renderer: generar sin DXF avisa en vez de fallar', async () => {
     api.loadExample = async () => ({ ok: false, error: 'El archivo de ejemplo no está disponible.' });
     app.click('btnGenerate');
     await sleep(60);
+    assertNoErrors(app);
+  } finally {
+    app.close();
+  }
+});
+
+test('Renderer: modo 2D y códigos modales llegan a la generación', async () => {
+  const app = await createApp();
+  try {
+    // Activar el modo 2D deshabilita los controles de profundidad y pestañas.
+    const twoD = app.$('twoDMode');
+    twoD.checked = true;
+    app.change('twoDMode');
+    await sleep(40);
+
+    ok(app.$('safeZ').disabled === true, 'Z seguro se deshabilita en modo 2D');
+    ok(app.$('tabsEnabled').disabled === true, 'las pestañas se deshabilitan en modo 2D');
+    includes(app.$('passesInfo').textContent, 'Modo 2D');
+
+    // Diálogo de códigos modales.
+    app.click('btnModalCodes');
+    ok(!app.$('modalCodes').classList.contains('hidden'), 'el diálogo debe abrirse');
+    app.$('codesBeforeG0').value = 'M5 ; oxigeno off';
+    app.$('codesAfterG0').value = 'M3 ; oxigeno on';
+    app.click('modalCodesApply');
+    ok(app.$('modalCodes').classList.contains('hidden'), 'el diálogo debe cerrarse');
+    includes(app.$('modalCodesSummary').textContent, 'antes de G00');
+
+    app.click('btnGenerate');
+    await waitFor(() => app.$('gcodeText').value.length > 0, 'código G generado');
+
+    const call = app.api.calls.filter(([name]) => name === 'generate').pop();
+    ok(call, 'debe haberse llamado a generar');
+    ok(call[1].params.twoDMode === true, 'el modo 2D se envía al proceso principal');
+    ok(call[1].params.modalCodes.beforeG0 === 'M5 ; oxigeno off', 'el código previo se envía');
+    ok(call[1].params.modalCodes.afterG0 === 'M3 ; oxigeno on', 'el código posterior se envía');
+    ok(!/\bZ[-+]?\d/.test(app.$('gcodeText').value), 'el programa generado no contiene Z');
+
+    assertNoErrors(app);
+  } finally {
+    app.close();
+  }
+});
+
+
+test('Renderer: el cambio de idioma traduce toda la interfaz', async () => {
+  const app = await createApp();
+  try {
+    const handler = app.api.getLanguageHandler();
+    ok(typeof handler === 'function', 'el renderer debe suscribirse a los cambios de idioma');
+
+    const en = messagesFor('en');
+    handler({ language: 'en', messages: en, languages: LANGUAGE_LIST, ...catalogsFor('en') });
+    await sleep(60);
+
+    ok(app.window.document.documentElement.lang === 'en', 'atributo lang del documento');
+    ok(app.$('btnGenerate').textContent === en['actions.generate'],
+      'botón de generar: ' + app.$('btnGenerate').textContent);
+    ok(app.doc.querySelector('[data-i18n="panel.file"]').textContent === en['panel.file'],
+      'título del panel de archivo');
+    ok(app.$('safetyBadge').textContent === en['safety.none'],
+      'insignia de seguridad: ' + app.$('safetyBadge').textContent);
+    ok(app.$('fileInfo').textContent.includes('entities'),
+      'información del archivo: ' + app.$('fileInfo').textContent);
+    ok(app.$('passesInfo').textContent.includes('pass'),
+      'cálculo de pasadas: ' + app.$('passesInfo').textContent);
+
+    const select = app.doc.querySelector('.layer-row select');
+    const labels = catalogsFor('en').operationLabels;
+    ok(select.options[0].textContent === labels[select.options[0].value],
+      'las operaciones CAM se traducen en el selector de capas');
+
+    const zeroSelect = app.$('workZero');
+    ok(zeroSelect.options[0].textContent === catalogsFor('en').zeroModes[0].label,
+      'el cero de trabajo se traduce');
+    ok(zeroSelect.value === 'bottom_left', 'la selección del cero se conserva');
+
+    // La ayuda y el «acerca de» también usan el diccionario activo.
+    app.api.getMenuHandler()('show-help');
+    await sleep(20);
+    includes(app.$('modalBody').textContent, 'SAFE CNC 2D TOOLPATH GUIDE');
+    app.click('modalOk');
+
+    app.api.getMenuHandler()('show-about');
+    await sleep(20);
+    includes(app.$('modalBody').textContent, 'Safe toolpath generator');
+    app.click('modalOk');
+
+    // Volver al español.
+    handler({
+      language: 'es',
+      messages: messagesFor('es'),
+      languages: LANGUAGE_LIST,
+      ...catalogsFor('es'),
+    });
+    await sleep(60);
+    ok(app.window.document.documentElement.lang === 'es', 'vuelve al español');
+    ok(app.$('safetyBadge').textContent === messagesFor('es')['safety.none'],
+      'insignia de seguridad en español');
+    includes(app.$('fileInfo').textContent, 'entidades');
     assertNoErrors(app);
   } finally {
     app.close();

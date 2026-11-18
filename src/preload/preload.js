@@ -43,6 +43,19 @@ contextBridge.exposeInMainWorld('api', {
   /** Abre la carpeta de ejemplos en el explorador. */
   openExamples: () => ipcRenderer.invoke('shell:open-examples'),
 
+  /**
+   * Cambia el idioma de la aplicación (código ISO: 'es', 'en', …).
+   * Devuelve el diccionario ya resuelto para el nuevo idioma.
+   */
+  setLanguage: (code) => ipcRenderer.invoke('language:set', code),
+
+  /** Suscribe los cambios de idioma. Devuelve la función para desuscribirse. */
+  onLanguageChange: (callback) => {
+    const listener = (_event, payload) => callback(payload);
+    ipcRenderer.on('language:changed', listener);
+    return () => ipcRenderer.removeListener('language:changed', listener);
+  },
+
   /** Suscribe acciones del menú nativo. Devuelve la función para desuscribirse. */
   onMenuAction: (callback) => {
     const listener = (_event, action) => callback(action);

@@ -27,6 +27,7 @@ function installFakeElectron() {
   const events = new Map();
   const windows = [];
   const clipboardWrites = [];
+  const sends = [];
   let readyCallback = null;
   let saveDialogResult = { canceled: true, filePath: undefined };
   let openDialogResult = { canceled: true, filePaths: [] };
@@ -58,6 +59,9 @@ function installFakeElectron() {
       this.destroyed = false;
       windows.push(this);
       this.webContents = {
+        send: (channel, payload) => {
+          sends.push([channel, payload]);
+        },
         on: () => {},
         once: (event, callback) => {
           if (event === 'did-finish-load') this.__didFinishLoad = callback;
@@ -80,6 +84,14 @@ function installFakeElectron() {
     }
 
     show() {}
+
+    setTitle() {}
+
+    isMinimized() { return false; }
+
+    restore() {}
+
+    focus() {}
 
     isDestroyed() {
       return this.destroyed;
@@ -127,6 +139,7 @@ function installFakeElectron() {
     handlers,
     windows,
     clipboardWrites,
+    sends,
     get readyCallback() { return readyCallback; },
     setSaveDialog: (result) => { saveDialogResult = result; },
     setOpenDialog: (result) => { openDialogResult = result; },
@@ -342,7 +355,8 @@ test('Preload: expone exactamente la API que usa la interfaz', () => {
   ok(exposed.api, 'debe exponerse window.api');
   const expected = [
     'info', 'openDxf', 'loadDxf', 'reloadDxf', 'loadExample', 'preview', 'generate',
-    'saveGcode', 'exportReport', 'copyText', 'openExamples', 'onMenuAction',
+    'saveGcode', 'exportReport', 'copyText', 'openExamples', 'setLanguage',
+    'onLanguageChange', 'onMenuAction',
   ];
   for (const method of expected) {
     ok(typeof exposed.api[method] === 'function', `falta api.${method}`);
@@ -352,4 +366,96 @@ test('Preload: expone exactamente la API que usa la interfaz', () => {
 
   const unsubscribe = exposed.api.onMenuAction(() => {});
   ok(typeof unsubscribe === 'function', 'onMenuAction debe devolver la baja');
+});
+
+test('Main: el modo 2D genera un programa sin eje Z ni pestañas', async () => {
+  const loaded = await invoke('dxf:load', EXAMPLE_DXF);
+  const result = await invoke('cam:generate', {
+    params: guiParams({ twoDMode: true, tabsEnabled: true }),
+    layerConfigs: loaded.data.layerConfigs,
+  });
+
+  ok(result.ok === true, `generación fallida: ${result.error || ''}`);
+  ok(!/\bZ[-+]?\d/.test(result.gcode), 'el programa no debe contener coordenadas Z');
+  ok(!result.gcode.includes('Pestaña (Tab)'), 'no debe haber pestañas en modo 2D');
+  ok(result.stats.numPasses === 1, `pasadas: ${result.stats.numPasses}`);
+  ok(result.params.twoDMode === true, 'el modo 2D vuelve al renderer');
+  ok(result.params.tabsEnabled === false, 'las pestañas se desactivan en modo 2D');
+  ok(result.safety.status === 'SEGURO', `estado: ${result.safety.status}`);
+});
+
+test('Main: los códigos modales se insertan alrededor de los movimientos', async () => {
+  const loaded = await invoke('dxf:load', EXAMPLE_DXF);
+  const result = await invoke('cam:generate', {
+    params: guiParams({
+      modalCodes: {
+        beforeG0: 'M5 ; oxigeno off',
+        afterG0: 'M3 ; oxigeno on',
+        beforeArc: '',
+        afterArc: '',
+      },
+    }),
+    layerConfigs: loaded.data.layerConfigs,
+  });
+
+  ok(result.ok === true, `generación fallida: ${result.error || ''}`);
+  includes(result.gcode, 'M5 ; oxigeno off');
+  includes(result.gcode, 'M3 ; oxigeno on');
+
+  const lines = result.gcode.split('\n');
+  const index = lines.indexOf('M5 ; oxigeno off');
+  ok(index >= 0 && /^G0?0\s/.test(lines[index + 1]), 'el código previo antecede a un G00');
+  ok(index >= 0 && lines[index + 2] === 'M3 ; oxigeno on', 'el código posterior sigue al G00');
+});
+
+
+test('Main: el idioma activo cambia catálogos, preferencias y programa generado', async () => {
+  loadMain();
+  const { loadLocales } = require('../src/shared/locales');
+  const languages = loadLocales(PROJECT_ROOT);
+  const en = languages.find((language) => language.code === 'en').messages;
+  const es = languages.find((language) => language.code === 'es').messages;
+
+  const activated = await invoke('language:set', 'en');
+  ok(activated.ok === true, 'language:set debe responder');
+  ok(activated.language === 'en', 'idioma activo: ' + activated.language);
+  ok(activated.messages['menu.file'] === en['menu.file'], 'se envía el diccionario inglés');
+  ok(activated.operationLabels.PERFIL_EXTERIOR === en['operation.PERFIL_EXTERIOR'],
+    'los catálogos llegan traducidos al renderer');
+
+  const info = await invoke('app:info');
+  ok(info.language === 'en', 'app:info refleja el idioma activo');
+  ok(info.messages['menu.file'] === en['menu.file'], 'app:info incluye el diccionario');
+
+  const settingsFile = path.join(TMP_DIR, 'settings.json');
+  ok(fs.existsSync(settingsFile), 'debe guardarse el archivo de preferencias');
+  ok(JSON.parse(fs.readFileSync(settingsFile, 'utf8')).language === 'en',
+    'el idioma debe persistirse');
+
+  const loaded = await invoke('dxf:load', EXAMPLE_DXF);
+  const generated = await invoke('cam:generate', {
+    params: guiParams({ tabsEnabled: false }),
+    layerConfigs: loaded.data.layerConfigs,
+  });
+
+  includes(generated.gcode, '; Program: CORTE_SEGURO_2D', 'cabecera del programa en inglés');
+  includes(generated.gcode, '; Operation: ', 'comentario de operación en inglés');
+  includes(generated.gcode, '; End of CNC program', 'pie de programa en inglés');
+  includes(generated.safety.reportText, en['safety.report.title'], 'informe de seguridad en inglés');
+  ok(generated.safety.status === 'SEGURO', 'estado de seguridad: ' + generated.safety.status);
+
+  // Un idioma desconocido no debe romper la aplicación.
+  const unknown = await invoke('language:set', 'xx');
+  ok(unknown.language === 'es', 'idioma desconocido cae al de referencia');
+
+  const back = await invoke('language:set', 'es');
+  ok(back.language === 'es', 'vuelve al español');
+  const generatedEs = await invoke('cam:generate', {
+    params: guiParams({ tabsEnabled: false }),
+    layerConfigs: loaded.data.layerConfigs,
+  });
+  includes(generatedEs.gcode, '; Programa: CORTE_SEGURO_2D');
+  includes(generatedEs.gcode, '; Operación: ');
+  includes(generatedEs.gcode, '; Fin de programa CNC');
+  includes(generatedEs.safety.reportText, es['safety.report.title']);
 });

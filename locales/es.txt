@@ -1,0 +1,381 @@
+# ---------------------------------------------------------------------------
+# Archivo de idioma: Español
+#
+# Formato: clave=valor
+#   - Las líneas que empiezan por # son comentarios.
+#   - Una línea que empieza por + continúa el valor de la clave anterior.
+#   - Los marcadores {nombre} se sustituyen al mostrar el texto.
+#
+# Para añadir un idioma, copie este archivo como locales/<código>.txt,
+# traduzca los valores y reinicie la aplicación. El idioma aparecerá
+# automáticamente en el menú Archivo > Idioma.
+# ---------------------------------------------------------------------------
+
+meta.name=Español
+meta.code=es
+
+# Aplicación
+app.title=CAD-CAM 2D CNC - Generador de Trayectorias Seguras
+app.shortTitle=CAD-CAM 2D CNC
+app.windowTitle=CAD-CAM 2D CNC - Generador de Trayectorias Seguras
+
+# Menú nativo
+menu.file=Archivo
+menu.open=Abrir archivo DXF...
+menu.reload=Recargar DXF actual
+menu.save=Guardar Código G (.nc, .gcode)...
+menu.exportReport=Exportar Informe de Seguridad...
+menu.loadExample=Abrir ejemplo incluido
+menu.language=Idioma
+menu.exit=Salir
+menu.cam=CAM / Herramientas
+menu.generate=Generar Código G Seguro
+menu.safety=Verificar Seguridad de Trayectorias
+menu.fit=Centrar Vista CAD
+menu.viewCad=Visor CAD
+menu.viewGcode=Código G
+menu.viewSim=Simulador CNC
+menu.help=Ayuda
+menu.guide=Guía de Trayectorias Seguras
+menu.about=Acerca de
+menu.openExamples=Abrir carpeta de ejemplos
+menu.devTools=Herramientas de desarrollo
+
+# Paneles de la barra lateral
+panel.file=1. Archivo DXF
+btn.open=📂 Abrir DXF...
+btn.reloadTitle=Volver a leer el archivo actual
+fileInfo.none=Ningún archivo cargado
+
+panel.layers=2. Capas y Operaciones CAM
+panel.layersHint=Asigna operaciones de mecanizado por capa:
+layers.empty=Sin capas con entidades.
+layers.toggleTitle=Mostrar u ocultar capa
+layers.entitiesTitle={name} ({count} entidades)
+layers.operationTitle=Operación CAM de la capa
+
+panel.tool=3. Herramienta y Seguridad Z
+field.toolDiameter=Diámetro fresa (mm)
+field.safeZ=Z seguro (G0) (mm)
+field.retractZ=Z aproximación (mm)
+field.targetDepth=Profundidad total (mm)
+field.stepdown=Paso por pasada (mm)
+passes.initial=Cálculo: 2 pasadas en Z
+passes.twoD=Modo 2D: sin pasadas en Z (un único recorrido XY)
+passes.calcOne=Cálculo: 1 pasada en Z ({values} mm)
+passes.calcMany=Cálculo: {count} pasadas en Z ({values} mm)
+passes.one=Cálculo: 1 pasada
+
+panel.feeds=4. Avances y Husillo
+field.cutFeed=Avance corte XY (mm/min)
+field.plungeFeed=Avance penetración Z (mm/min)
+field.spindleRpm=Velocidad husillo (RPM)
+
+panel.tabs=5. Pestañas de Sujeción
+tabs.enable=Activar pestañas de fijación de pieza
+field.tabCount=Cantidad de pestañas
+field.tabWidth=Ancho de pestaña (mm)
+field.tabHeight=Altura sobre fondo (mm)
+
+panel.zero=6. Cero Pieza y Postprocesador
+field.workZero=Cero de trabajo
+field.postProfile=Controlador CNC
+twoD.label=Modo 2D: eliminar el eje Z del programa
+twoD.hint=Para antorchas de oxicorte que no levantan el eje Z: omite todas las palabras Z, las pasadas en profundidad y las pestañas.
+
+panel.modalCodes=7. Códigos Modales
+panel.modalCodesHint=Inserte comandos antes o después de cada rápido G00 y de cada arco G02/G03 (por ejemplo, para abrir o cerrar el oxígeno).
+btn.modalCodes=⚙ Configurar códigos modales...
+modalCodes.none=Sin códigos configurados.
+modalCodes.summary.configured=Configurados: {list}.
+modalCodes.summary.none=Sin códigos configurados.
+modalCodes.label.beforeG0=antes de G00
+modalCodes.label.afterG0=después de G00
+modalCodes.label.beforeArc=antes de G02/G03
+modalCodes.label.afterArc=después de G02/G03
+modalCodes.title=Códigos modales por movimiento
+modalCodes.hint=Se insertan tal cual en el programa generado: un fragmento por línea. Los códigos para G00 también se aplican a G0; los de arco, a G02 y G03. El retorno final a origen no dispara códigos (así no se reactiva el oxígeno tras el apagado). Nota: este generador convierte los arcos en segmentos G1, por lo que los códigos de arco solo se aplican si el programa contiene G02/G03.
+modalCodes.beforeG0=Antes de G00 (rápido)
+modalCodes.afterG0=Después de G00 (rápido)
+modalCodes.beforeArc=Antes de G02 / G03 (arco)
+modalCodes.afterArc=Después de G02 / G03 (arco)
+modalCodes.placeholder.beforeG0=M5 ; apagar oxígeno antes del rápido
+modalCodes.placeholder.afterG0=M3 ; encender oxígeno tras el rápido
+modalCodes.cancel=Cancelar
+modalCodes.apply=Aplicar
+
+# Acciones principales
+actions.generate=🚀 GENERAR G-CODE SEGURO
+actions.generating=⏳ Generando...
+actions.save=💾 Guardar Programa CNC...
+actions.safety=🛡 Informe de Seguridad
+
+# Pestañas del área de trabajo
+tabs.cad=📐 Visor CAD / CAM
+tabs.gcode=📝 Código G Generado
+tabs.sim=🎮 Simulador CNC 2D
+
+# Visor CAD
+cad.zoomIn=Acercar
+cad.zoomOut=Alejar
+cad.fitTitle=Ajustar vista
+cad.fit=🏠 Ajustar vista
+cad.showToolpaths=Mostrar trayectorias compensadas
+cad.coords=X: {x} mm | Y: {y} mm
+cad.coordsStart=X: 0.000 mm | Y: 0.000 mm
+cad.hint=Haz clic en «Abrir DXF...» para cargar una pieza.
+cad.width=Ancho: {value} mm
+cad.height=Alto: {value} mm
+cad.zeroLabel=Cero (0,0)
+
+# Visor de código G
+gcode.stats.empty=Genere el código G para visualizar estadísticas.
+gcode.copy=📋 Copiar
+gcode.saveAs=💾 Guardar como...
+gcode.placeholder=Aún no se ha generado ningún programa.
+
+# Simulador
+sim.start=▶ Iniciar
+sim.pause=⏸ Pausar
+sim.stop=⏹ Detener
+sim.step=⏭ Paso
+sim.reset=⟳ Reiniciar
+sim.speed=Velocidad
+sim.progress=Avance
+sim.telemetryStart=X: 0.000 | Y: 0.000 | Z: 0.000 | T: 0.0s
+sim.hint=Genere el código G para inicializar el simulador.
+sim.blocks=Bloques G-Code en ejecución
+sim.finished=Simulación finalizada | T: {time}s
+sim.telemetry=X: {x} | Y: {y} | Z: {z} | Paso: {step}/{total} | T: {time}s / {totalTime}s
+
+# Barra de estado y seguridad
+status.ready=Listo. Abra un archivo DXF para comenzar.
+status.loaded=DXF cargado: {name} · {count} entidades procesables
+status.generated=Código G generado · {blocks} bloques · {status}
+status.generationError=Error en la generación de código G.
+status.saved=G-Code guardado en {file}
+safety.none=Seguridad: sin calcular
+safety.status=Seguridad: {status} {icon}
+safety.SEGURO=SEGURO
+safety.ADVERTENCIA=ADVERTENCIA
+safety.PELIGRO=PELIGRO
+
+# Diálogos genéricos
+modal.close=Cerrar
+modal.ok=Cerrar
+
+# Mensajes dinámicos
+fileInfo.loaded={name} · {width} × {height} mm · {count} entidades
+toast.unsupported=Entidades no soportadas ignoradas: {detail}
+toast.reloaded=Archivo DXF recargado.
+toast.exampleLoaded=Ejemplo cargado: ejemplo_pieza.dxf
+toast.noDxf=No hay ningún DXF cargado.
+toast.loadError=No se pudo cargar el archivo.
+toast.generateNoDxf=Cargue primero un archivo DXF.
+toast.generateFirst=Genere primero el código G antes de guardar.
+toast.generateFirstReport=Genere primero el código G.
+toast.generateFirstSafety=Genere primero el código G para inspeccionar su seguridad.
+toast.noGcode=No hay código G para copiar.
+toast.generateError=No se pudo generar el código G.
+toast.saved=Archivo guardado:
++{path}
+toast.saveError=No se pudo guardar el archivo.
+toast.reportExported=Informe exportado:
++{path}
+toast.reportError=No se pudo exportar el informe.
+toast.copied=Código G copiado al portapapeles.
+toast.modalCodesUpdated=Códigos modales actualizados.
+toast.initError=Error al iniciar la aplicación: {message}
+toast.generated=Código G generado con éxito.
++• Estado de seguridad: {status}
++{depth}
++• Tiempo estimado: {time} min
+toast.generated2d=• Programa 2D: sin eje Z
+toast.generatedDepth=• Pasadas en Z: {passes}
++• Profundidad Z: {depth} mm
+
+# Estadísticas del programa
+stats.summary={blocks} bloques · corte {cut} mm · rápido {rapid} mm · {time} min · {mode} · {status}
+stats.mode2d=modo 2D sin eje Z
+stats.passes={count} pasadas
+
+# Operaciones CAM
+operation.PERFIL_EXTERIOR=Perfil exterior +R
+operation.PERFIL_INTERIOR=Perfil interior −R
+operation.SOBRE_LINEA=Sobre línea
+operation.CAJEADO=Cajeado
+operation.TALADRADO=Taladrado
+operationDesc.PERFIL_EXTERIOR=Compensa el filo hacia fuera (+radio) para conservar la medida de la pieza
+operationDesc.PERFIL_INTERIOR=Compensa el filo hacia dentro (−radio) en agujeros y ventanas interiores
+operationDesc.SOBRE_LINEA=Corta sobre el vector: grabado, láser o plasma
+operationDesc.CAJEADO=Pasadas concéntricas hasta vaciar la cajera
+operationDesc.TALADRADO=Ciclo de taladrado en el centro de los círculos
+
+# Cero pieza
+zero.bottom_left=Inferior izquierda
+zero.center=Centro de la pieza
+zero.top_left=Superior izquierda
+zero.drawing_zero=Cero del dibujo
+
+# Diálogos nativos
+dialog.openTitle=Seleccionar archivo DXF
+dialog.filterDxf=Archivos DXF
+dialog.filterAll=Todos los archivos
+dialog.saveTitle=Guardar archivo G-Code
+dialog.saveFilterNc=Archivos NC (*.nc)
+dialog.saveFilterGcode=Archivos G-Code (*.gcode)
+dialog.saveFilterTap=Archivos TAP (*.tap)
+dialog.saveFilterTxt=Archivos de texto (*.txt)
+dialog.reportTitle=Exportar informe de seguridad
+dialog.reportFilter=Texto (*.txt)
+
+# Errores del proceso principal
+error.dxfEntities=El archivo DXF no contiene entidades 2D procesables (LINE, ARC, CIRCLE, LWPOLYLINE, POLYLINE, SPLINE o ELLIPSE).
+error.dxfOpen=No se pudo cargar el archivo DXF:
++{message}
+error.dxfReloadNone=No hay ningún DXF cargado.
+error.dxfReload=No se pudo recargar el archivo DXF:
++{message}
+error.exampleMissing=El archivo de ejemplo no está disponible.
+error.exampleLoad=No se pudo cargar el ejemplo:
++{message}
+error.noDxf=Cargue primero un archivo DXF.
+error.noEntities=No hay entidades activas o capas visibles para mecanizar.
+error.generate=No se pudo generar el código G:
++{message}
+error.saveNoGcode=Genere primero el código G antes de guardar.
+error.save=No se pudo guardar el archivo:
++{message}
+error.exportNoGcode=Genere primero el código G.
+error.export=No se pudo exportar el informe.
+
+# Informe de seguridad
+safety.report.title=== INFORME DE SEGURIDAD CNC ===
+safety.report.windowTitle=Informe de verificación de seguridad CNC
+safety.report.status=Estado general: {status}
+safety.report.mode=Modo de mecanizado: {mode}
+safety.report.mode2d=2D (sin eje Z)
+safety.report.mode25d=2.5D (con eje Z)
+safety.report.moves=Movimientos rápidos G0: {rapid} | Movimientos de corte: {cut}
+safety.report.ok2d=[OK] Programa 2D: no se emiten movimientos ni retracciones en Z.
+safety.report.zsafe=Z Seguro configurado: {safe} mm | Z Máximo alcanzado: {max} mm
+safety.report.ztarget=Z Objetivo: {target} mm | Z Mínimo alcanzado: {min} mm
+safety.report.allOk=[OK] Todas las comprobaciones de colisión y cotas superadas con éxito.
+safety.report.errors=ERRORES CRÍTICOS:
+safety.report.warnings=ADVERTENCIAS:
+safety.rule.rapidXY=Línea {line}: Movimiento rápido G0 en XY a Z={z}mm (por debajo de Z Seguro {safe}mm). Peligro de colisión.
+safety.rule.cutNoSpindle=Línea {line}: Corte a Z={z}mm sin comando M3 previo o con husillo apagado.
+safety.rule.plungeFeed=Línea {line}: Penetración en Z con avance F{feed} mayor al límite seguro ({limit} mm/min).
+safety.rule.cutNoSpindle2d=Línea {line}: Corte sin comando M3 previo o con antorcha apagada.
+safety.rule.depth=Profundidad mínima alcanzada ({min}mm) excede la profundidad objetivo ({target}mm).
+safety.rule.noM5=El programa no incluye comando M5 para apagar el husillo al finalizar.
+safety.rule.notRetracted=El programa no finaliza con la herramienta retraída a Z seguro ({safe}mm).
+
+# Comentarios del programa G generado
+gcode.error.noEntities=No hay entidades activas o capas visibles para mecanizar.
+gcode.header.program=Programa: {name}
+gcode.header.postprocessor=Postprocesador: {profile}
+gcode.header.tool=Herramienta: D={diameter}mm
+gcode.header.mode2d=Modo 2D activo: programa sin eje Z (antorcha fija)
+gcode.header.totalDepth=Profundidad Total: {depth}mm
+gcode.header.cutFeed=Avance Corte: {feed} mm/min
+gcode.header.plungeFeed=Avance Penetración: {feed} mm/min
+gcode.header.unitsMm=Unidades en milímetros (mm)
+gcode.header.absolute=Coordenadas absolutas
+gcode.header.planeXY=Plano de trabajo XY
+gcode.header.initialSafe=Posición de seguridad inicial
+gcode.header.spindleOn=Encender husillo horario
+gcode.header.dwell=Espera para alcanzar RPM
+gcode.header.coolantOn=Refrigerante encendido
+gcode.header.toolChange=Cambio a herramienta 1
+gcode.header.continuous=Control de trayectoria continuo
+gcode.header.mm=mm
+gcode.header.absoluteShort=absoluto
+gcode.header.laserOff=Láser apagado para inicio seguro
+gcode.comment.contour=Contorno {index}/{total} - Capa: '{layer}'
+gcode.comment.operation=Operación: {operation} | Nivel Anidado: {nesting}
+gcode.comment.drillPoint2d=Punto de perforación (modo 2D)
+gcode.comment.ensureClearance=Asegurar altura libre
+gcode.comment.positioningXY=Posicionamiento XY
+gcode.comment.cut2d=Recorrido de corte 2D (sin eje Z)
+gcode.comment.torchOn=Encender antorcha / láser
+gcode.comment.torchOff=Apagar antorcha / láser
+gcode.comment.approach=Aproximación rápida
+gcode.comment.pass=Pasada {index}/{total} a Z = {z} mm
+gcode.comment.plunge=Penetración controlada
+gcode.comment.tab=Pestaña (Tab)
+gcode.comment.tabReturn=Retorno a corte
+gcode.comment.safeRetract=Retracción segura
+gcode.footer.finish=Fin de operaciones de mecanizado
+gcode.footer.retract=Retracción obligatoria a Z seguro
+gcode.footer.coolantOff=Apagar refrigerante
+gcode.footer.spindleOff=Apagar husillo / antorcha
+gcode.footer.returnHome=Retorno a origen de pieza
+gcode.footer.end=Fin de programa CNC
+
+# Ayuda integrada
+help.title=Guía de trayectorias seguras
+help.text=GUÍA DE TRAYECTORIAS SEGURAS CNC 2D
++
++1. Planos de seguridad Z
++   • Z Seguro (Clearance): altura a la que se ejecutan todos los movimientos
++     rápidos G0. Evita mordazas, tornillos y fijaciones.
++   • Z Aproximación (Retract): altura intermedia antes de penetrar a avance
++     controlado.
++
++2. Regla Inside-First (interiores primero)
++   • El programa detecta agujeros y cajeras interiores y los mecaniza ANTES
++     que el perímetro exterior. Si se corta el exterior primero, la pieza se
++     suelta y puede causar una colisión.
++
++3. Pasadas múltiples
++   • La profundidad total se reparte en capas uniformes que nunca superan el
++     paso por pasada (stepdown), protegiendo la fresa.
++
++4. Pestañas de sujeción
++   • Dejan pequeños puentes de material en la última pasada para evitar que la
++     pieza se proyecte al terminar el corte.
++
++5. Compensación de radio de fresa
++   • Perfil exterior: desplaza el filo hacia fuera (+R).
++   • Perfil interior: desplaza el filo hacia dentro (-R).
++   • Sobre línea: corta directamente sobre el vector (grabado, láser, plasma).
++
++6. Comprobaciones automáticas antes de volar
++   • Ningún G0 en XY por debajo de Z seguro.
++   • Husillo encendido (M3) antes de tocar material.
++   • Penetración en Z a avance controlado.
++   • Profundidad mínima dentro de la programada.
++   • Retracción final y apagado (M5).
++
++7. Modo 2D (sin eje Z)
++   • Elimina todas las palabras Z del programa: sin pasadas, sin
++     retracciones y sin pestañas.
++   • Pensado para antorchas de oxicorte que no levantan el eje Z y solo
++     apagan el oxígeno durante los rápidos.
++   • El taladrado se convierte en un simple punto de perforación.
++
++8. Códigos modales
++   • Permiten insertar comandos propios antes y después de cada G00 y de
++     cada G02/G03, por ejemplo para abrir o cerrar el oxígeno.
++   • Los fragmentos se insertan sin reinterpretarse, por lo que pueden
++     contener varios comandos M o incluso movimientos.
+
+# Acerca de
+about.title=Acerca de
+about.text=CAD-CAM 2D CNC · Generador de trayectorias seguras
++Versión {version}
++
++Suite CAD-CAM multiplataforma construida con Electron.
++Importa DXF (líneas, arcos, círculos, polilíneas con bulges, splines y
++elipses), genera código G con compensación de herramienta, pasadas
++múltiples, pestañas de sujeción y verificación de seguridad previa.
++
++Compatible con GRBL, Candle, CNCjs, UGS, Mach3/4, LinuxCNC, Marlin y
++láser/plasma 2D.
++
++Electron {electron} · Plataforma {platform}
+
+# Nombres de archivo propuestos en los diálogos de guardado
+file.programName=programa.nc
+file.reportName=informe_seguridad.txt

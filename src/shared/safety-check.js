@@ -20,16 +20,28 @@ const X_RE = /X([-+]?[\d.]+)/;
 const Y_RE = /Y([-+]?[\d.]+)/;
 const Z_RE = /Z([-+]?[\d.]+)/;
 
+// Movimientos con límites reales: evita confundir G17/G10 con G1.
+const G0_RE = /(?:^|\s)G0?0(?=[\sA-Z]|$)/;
+const G1_RE = /(?:^|\s)G0?1(?=[\sA-Z]|$)/;
+const G2_RE = /(?:^|\s)G0?2(?=[\sA-Z]|$)/;
+const G3_RE = /(?:^|\s)G0?3(?=[\sA-Z]|$)/;
+
+const { translator } = require('./locales');
+
 class SafetyChecker {
   /**
    * @param {string} gcodeText Programa G completo.
    * @param {number} safeZ Altura de seguridad configurada.
    * @param {number} targetDepth Profundidad objetivo.
    * @param {number} maxPlungeFeed Avance de penetración considerado seguro.
+   * @param {{twoDMode?:boolean, t?:Function}} [options] Modo 2D (no hay eje Z que
+   *   verificar) y función de traducción del informe.
    * @returns {{status:string, errors:string[], warnings:string[], minZ:number, maxZ:number, reportText:string}}
    */
-  static verifyGcode(gcodeText, safeZ, targetDepth, maxPlungeFeed) {
+  static verifyGcode(gcodeText, safeZ, targetDepth, maxPlungeFeed, options = {}) {
     const lines = String(gcodeText || '').split('\n');
+    const twoD = Boolean(options && options.twoDMode);
+    const t = options && typeof options.t === 'function' ? options.t : translator();
 
     const errors = [];
     const warnings = [];
@@ -74,39 +86,45 @@ class SafetyChecker {
       const newY = yMatch ? parseFloat(yMatch[1]) : currentY;
       const newZ = zMatch ? parseFloat(zMatch[1]) : currentZ;
 
-      const isG0 = lineUpper.includes('G0 ') || lineUpper.includes('G00 ')
-        || lineUpper.startsWith('G0') || lineUpper.startsWith('G00');
-      const isG1 = lineUpper.includes('G1 ') || lineUpper.includes('G01 ')
-        || lineUpper.startsWith('G1') || lineUpper.startsWith('G01');
-      const isG2 = lineUpper.includes('G2 ') || lineUpper.includes('G02 ');
-      const isG3 = lineUpper.includes('G3 ') || lineUpper.includes('G03 ');
+      const isG0 = G0_RE.test(lineUpper);
+      const isG1 = G1_RE.test(lineUpper);
+      const isG2 = G2_RE.test(lineUpper);
+      const isG3 = G3_RE.test(lineUpper);
 
       if (isG0) {
         rapidMoves += 1;
-        // REGLA CRÍTICA 1.
+        // REGLA CRÍTICA 1 (no aplica en modo 2D: no hay eje Z).
         const xyMoved = Math.abs(newX - currentX) > 0.001 || Math.abs(newY - currentY) > 0.001;
-        if (xyMoved && currentZ < safeZ - 0.01) {
-          errors.push(
-            `Línea ${lineNum}: Movimiento rápido G0 en XY a Z=${currentZ.toFixed(3)}mm `
-            + `(por debajo de Z Seguro ${safeZ}mm). Peligro de colisión.`,
-          );
+        if (!twoD && xyMoved && currentZ < safeZ - 0.01) {
+          errors.push(t('safety.rule.rapidXY', {
+            line: lineNum,
+            z: currentZ.toFixed(3),
+            safe: safeZ,
+          }));
         }
       }
 
       if (isG1 || isG2 || isG3) {
         cutMoves += 1;
-        // REGLA CRÍTICA 2.
-        if (newZ < -0.001 && !spindleOn) {
-          warnings.push(
-            `Línea ${lineNum}: Corte a Z=${newZ.toFixed(3)}mm sin comando M3 previo o con husillo apagado.`,
-          );
-        }
-        // REGLA CRÍTICA 3.
-        if (newZ < currentZ && currentFeed > maxPlungeFeed * 1.5) {
-          warnings.push(
-            `Línea ${lineNum}: Penetración en Z con avance F${currentFeed.toFixed(1)} `
-            + `mayor al límite seguro (${maxPlungeFeed.toFixed(1)} mm/min).`,
-          );
+        if (!twoD) {
+          // REGLA CRÍTICA 2.
+          if (newZ < -0.001 && !spindleOn) {
+            warnings.push(t('safety.rule.cutNoSpindle', {
+              line: lineNum,
+              z: newZ.toFixed(3),
+            }));
+          }
+          // REGLA CRÍTICA 3.
+          if (newZ < currentZ && currentFeed > maxPlungeFeed * 1.5) {
+            warnings.push(t('safety.rule.plungeFeed', {
+              line: lineNum,
+              feed: currentFeed.toFixed(1),
+              limit: maxPlungeFeed.toFixed(1),
+            }));
+          }
+        } else if (!spindleOn) {
+          // En modo 2D el encendido de la antorcha sigue siendo obligatorio.
+          warnings.push(t('safety.rule.cutNoSpindle2d', { line: lineNum }));
         }
       }
 
@@ -117,19 +135,20 @@ class SafetyChecker {
       maxZ = Math.max(maxZ, currentZ);
     }
 
-    // REGLA CRÍTICA 4.
-    if (minZ < targetDepth - 0.05) {
-      errors.push(
-        `Profundidad mínima alcanzada (${minZ.toFixed(3)}mm) excede la profundidad objetivo (${targetDepth.toFixed(3)}mm).`,
-      );
+    // REGLA CRÍTICA 4 (no aplica en modo 2D).
+    if (!twoD && minZ < targetDepth - 0.05) {
+      errors.push(t('safety.rule.depth', {
+        min: minZ.toFixed(3),
+        target: targetDepth.toFixed(3),
+      }));
     }
 
     // REGLA CRÍTICA 5.
     if (spindleOn) {
-      warnings.push('El programa no incluye comando M5 para apagar el husillo al finalizar.');
+      warnings.push(t('safety.rule.noM5'));
     }
-    if (currentZ < safeZ - 0.01) {
-      warnings.push(`El programa no finaliza con la herramienta retraída a Z seguro (${safeZ}mm).`);
+    if (!twoD && currentZ < safeZ - 0.01) {
+      warnings.push(t('safety.rule.notRetracted', { safe: safeZ }));
     }
 
     let status = 'SEGURO';
@@ -137,24 +156,34 @@ class SafetyChecker {
     if (errors.length) status = 'PELIGRO';
 
     const reportLines = [
-      '=== INFORME DE SEGURIDAD CNC ===',
-      `Estado general: ${status}`,
-      `Z Seguro configurado: ${safeZ.toFixed(2)} mm | Z Máximo alcanzado: ${maxZ.toFixed(2)} mm`,
-      `Z Objetivo: ${targetDepth.toFixed(2)} mm | Z Mínimo alcanzado: ${minZ.toFixed(2)} mm`,
-      `Movimientos rápidos G0: ${rapidMoves} | Movimientos de corte: ${cutMoves}`,
+      t('safety.report.title'),
+      t('safety.report.status', { status: t(`safety.${status}`) }),
+      t('safety.report.mode', {
+        mode: twoD ? t('safety.report.mode2d') : t('safety.report.mode25d'),
+      }),
+      t('safety.report.moves', { rapid: rapidMoves, cut: cutMoves }),
     ];
 
+    if (twoD) {
+      reportLines.push(t('safety.report.ok2d'));
+    } else {
+      reportLines.push(
+        t('safety.report.zsafe', { safe: safeZ.toFixed(2), max: maxZ.toFixed(2) }),
+        t('safety.report.ztarget', { target: targetDepth.toFixed(2), min: minZ.toFixed(2) }),
+      );
+    }
+
     if (!errors.length && !warnings.length) {
-      reportLines.push('[OK] Todas las comprobaciones de colisión y cotas superadas con éxito.');
+      reportLines.push(t('safety.report.allOk'));
     } else {
       if (errors.length) {
         reportLines.push('');
-        reportLines.push('ERRORES CRÍTICOS:');
+        reportLines.push(t('safety.report.errors'));
         for (const e of errors) reportLines.push(` [ERROR] ${e}`);
       }
       if (warnings.length) {
         reportLines.push('');
-        reportLines.push('ADVERTENCIAS:');
+        reportLines.push(t('safety.report.warnings'));
         for (const w of warnings) reportLines.push(` [AVISO] ${w}`);
       }
     }

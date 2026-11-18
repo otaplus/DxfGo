@@ -742,6 +742,49 @@ canvas.panning {
   background: #52525a;
 }
 
+/* ------------------------- Códigos modales (diálogo) ---------------------- */
+
+.modal-codes {
+  width: min(620px, 92vw);
+}
+
+.modal-codes .modal-body {
+  white-space: normal;
+}
+
+.code-field {
+  display: block;
+  margin: 12px 0 0;
+}
+
+.code-field > span {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--fg);
+}
+
+.code-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 58px;
+  resize: vertical;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: #ffffff;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  padding: 6px 8px;
+  outline: none;
+}
+
+.code-field textarea:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.25);
+}
+
 /* --------------------------- Pantallas pequeñas -------------------------- */
 
 @media (max-width: 1180px) {

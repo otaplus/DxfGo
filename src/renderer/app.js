@@ -3,16 +3,28 @@
 /**
  * Lógica de la interfaz: formularios, capas, generación de código G y
  * coordinación entre los dos lienzos (visor CAD y simulador).
+ *
+ * Todos los textos visibles se obtienen de `window.I18n` (cargado antes que este
+ * archivo). Al cambiar de idioma se vuelve a aplicar el diccionario y se
+ * reconstruyen las partes dinámicas de la interfaz.
  */
 
 (function attachApp() {
-  const { $, toast, debounce, showModal, hideModal } = window.U;
+  const { $, debounce, showModal, hideModal } = window.U;
+  const { I18n } = window;
+
+  /** Traduce una clave al idioma activo. */
+  const t = (key, vars) => I18n.t(key, vars);
 
   /** Campos numéricos del formulario. */
   const NUMERIC_FIELDS = [
     'toolDiameter', 'safeZ', 'retractZ', 'targetDepth', 'stepdown',
     'cutFeed', 'plungeFeed', 'spindleRpm', 'tabCount', 'tabWidth', 'tabHeight',
   ];
+
+  const EMPTY_MODAL_CODES = {
+    beforeG0: '', afterG0: '', beforeArc: '', afterArc: '',
+  };
 
   const state = {
     info: null,
@@ -23,6 +35,13 @@
     safety: null,
     stats: null,
     busy: false,
+    modalCodes: { ...EMPTY_MODAL_CODES },
+    // Datos para poder repintar los textos al cambiar de idioma.
+    fileInfoVars: null,
+    statsView: null,
+    statusKey: 'status.ready',
+    statusVars: {},
+    languages: [],
   };
 
   let cadView = null;
@@ -43,6 +62,8 @@
     params.tabsEnabled = $('tabsEnabled').checked;
     params.workZero = $('workZero').value;
     params.postProfile = $('postProfile').value;
+    params.twoDMode = $('twoDMode').checked;
+    params.modalCodes = { ...state.modalCodes };
     return params;
   }
 
@@ -53,6 +74,22 @@
       if (input && Number.isFinite(params[field])) input.value = String(params[field]);
     }
     $('tabsEnabled').checked = Boolean(params.tabsEnabled);
+    $('twoDMode').checked = Boolean(params.twoDMode);
+    applyTwoDModeUI();
+  }
+
+  /** Deshabilita los controles que no intervienen en modo 2D. */
+  function applyTwoDModeUI() {
+    const twoD = $('twoDMode').checked;
+    const disabled = [
+      'safeZ', 'retractZ', 'targetDepth', 'stepdown',
+      'tabsEnabled', 'tabCount', 'tabWidth', 'tabHeight',
+    ];
+    for (const id of disabled) {
+      const input = $(id);
+      if (input) input.disabled = twoD;
+    }
+    updatePassesInfo();
   }
 
   /** Solicitud que entiende el proceso principal. */
@@ -61,18 +98,96 @@
   }
 
   // ---------------------------------------------------------------------------
+  // Barra de estado
+  // ---------------------------------------------------------------------------
+
+  /** Escribe el mensaje de estado traduciéndolo en el momento de pintarlo. */
+  function setStatus(key, vars = {}) {
+    state.statusKey = key;
+    state.statusVars = vars;
+    $('statusText').textContent = t(key, vars);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Códigos modales configurables
+  // ---------------------------------------------------------------------------
+
+  /** Relación entre claves de datos e identificadores del formulario. */
+  const MODAL_FIELDS = [
+    ['beforeG0', 'codesBeforeG0'],
+    ['afterG0', 'codesAfterG0'],
+    ['beforeArc', 'codesBeforeArc'],
+    ['afterArc', 'codesAfterArc'],
+  ];
+
+  /** Etiqueta traducible de cada campo de códigos modales. */
+  const MODAL_LABEL_KEYS = {
+    beforeG0: 'modalCodes.label.beforeG0',
+    afterG0: 'modalCodes.label.afterG0',
+    beforeArc: 'modalCodes.label.beforeArc',
+    afterArc: 'modalCodes.label.afterArc',
+  };
+
+  /** Vuelca los códigos configurados al formulario del diálogo. */
+  function writeModalCodesForm(codes = state.modalCodes) {
+    for (const [key, id] of MODAL_FIELDS) {
+      const field = $(id);
+      if (field) field.value = codes[key] || '';
+    }
+  }
+
+  /** Lee los códigos escritos en el diálogo. */
+  function readModalCodesForm() {
+    const codes = {};
+    for (const [key, id] of MODAL_FIELDS) {
+      const field = $(id);
+      codes[key] = field ? field.value : '';
+    }
+    return codes;
+  }
+
+  /** Resume en el panel qué fragmentos están configurados. */
+  function updateModalCodesSummary() {
+    const label = $('modalCodesSummary');
+    if (!label) return;
+    const active = MODAL_FIELDS
+      .filter(([key]) => String(state.modalCodes[key] || '').trim())
+      .map(([key]) => t(MODAL_LABEL_KEYS[key]));
+    label.textContent = active.length
+      ? t('modalCodes.summary.configured', { list: active.join(', ') })
+      : t('modalCodes.summary.none');
+  }
+
+  function openModalCodes() {
+    writeModalCodesForm();
+    $('modalCodes').classList.remove('hidden');
+  }
+
+  function closeModalCodes() {
+    $('modalCodes').classList.add('hidden');
+  }
+
+  function applyModalCodes() {
+    state.modalCodes = readModalCodesForm();
+    updateModalCodesSummary();
+    closeModalCodes();
+    window.U.toast(t('toast.modalCodesUpdated'), 'ok', 2200);
+  }
+
+  // ---------------------------------------------------------------------------
   // Interfaz de capas
   // ---------------------------------------------------------------------------
 
   function renderLayers() {
     const container = $('layerList');
+    if (!container) return;
     container.textContent = '';
 
     const layers = (state.payload ? state.payload.layers : [])
       .filter((layer) => layer.count > 0);
 
     if (!layers.length) {
-      container.appendChild(window.U.el('p', 'hint-text', 'Sin capas con entidades.'));
+      container.appendChild(window.U.el('p', 'hint-text', t('layers.empty')));
       return;
     }
 
@@ -86,7 +201,7 @@
       const checkbox = document.createElement('input');
       checkbox.type = 'checkbox';
       checkbox.checked = config.visible !== false;
-      checkbox.title = 'Mostrar u ocultar capa';
+      checkbox.title = t('layers.toggleTitle');
       checkbox.addEventListener('change', () => {
         config.visible = checkbox.checked;
         state.visibility[layer.name] = checkbox.checked;
@@ -98,7 +213,7 @@
       dot.style.background = layer.colorHex;
 
       const name = window.U.el('span', 'layer-name', layer.name);
-      name.title = `${layer.name} (${layer.count} entidades)`;
+      name.title = t('layers.entitiesTitle', { name: layer.name, count: layer.count });
 
       const count = window.U.el('span', 'layer-count', String(layer.count));
 
@@ -112,7 +227,7 @@
         if (operation === config.operation) option.selected = true;
         select.appendChild(option);
       }
-      select.title = descriptions[config.operation] || 'Operación CAM de la capa';
+      select.title = descriptions[config.operation] || t('layers.operationTitle');
       select.addEventListener('change', () => {
         config.operation = select.value;
         select.title = descriptions[select.value] || '';
@@ -133,13 +248,15 @@
   function updateWindowTitle() {
     const fileName = state.payload ? state.payload.fileName : '';
     document.title = fileName
-      ? `${fileName} — CAD-CAM 2D CNC`
-      : 'CAD-CAM 2D CNC - Generador de Trayectorias Seguras';
+      ? `${fileName} — ${t('app.shortTitle')}`
+      : t('app.windowTitle');
   }
 
   function applyLoadResult(result) {
     if (!result.ok) {
-      if (!result.canceled) toast(result.error || 'No se pudo cargar el archivo.', 'error', 7000);
+      if (!result.canceled) {
+        window.U.toast(result.error || t('toast.loadError'), 'error', 7000);
+      }
       return false;
     }
 
@@ -153,19 +270,25 @@
     state.gcode = '';
     state.safety = null;
     state.stats = null;
+    state.statsView = null;
 
     $('gcodeText').value = '';
-    $('gcodeStats').textContent = 'Genere el código G para visualizar estadísticas.';
+    $('gcodeStats').textContent = t('gcode.stats.empty');
     setSafety(null);
 
     const bounds = state.payload.bounds;
-    $('fileInfo').textContent = `${state.payload.fileName} · ${bounds.width.toFixed(1)} × `
-      + `${bounds.height.toFixed(1)} mm · ${state.payload.entityCount} entidades`;
+    state.fileInfoVars = {
+      name: state.payload.fileName,
+      width: bounds.width.toFixed(1),
+      height: bounds.height.toFixed(1),
+      count: state.payload.entityCount,
+    };
+    $('fileInfo').textContent = t('fileInfo.loaded', state.fileInfoVars);
 
     const unsupported = Object.entries(state.payload.unsupported || {});
     if (unsupported.length) {
       const detail = unsupported.map(([type, count]) => `${type} (${count})`).join(', ');
-      toast(`Entidades no soportadas ignoradas: ${detail}`, 'warn', 6000);
+      window.U.toast(t('toast.unsupported', { detail }), 'warn', 6000);
     }
 
     renderLayers();
@@ -181,9 +304,10 @@
 
     simView.clear();
 
-    const label = `DXF cargado: ${state.payload.fileName} · `
-      + `${state.payload.entityCount} entidades procesables`;
-    $('statusText').textContent = label;
+    setStatus('status.loaded', {
+      name: state.payload.fileName,
+      count: state.payload.entityCount,
+    });
     $('cadHint').classList.add('hidden');
 
     updateWindowTitle();
@@ -197,16 +321,18 @@
 
   async function reloadDxf() {
     if (!state.payload) {
-      toast('No hay ningún DXF cargado.', 'warn');
+      window.U.toast(t('toast.noDxf'), 'warn');
       return;
     }
     const result = await window.api.reloadDxf();
-    if (applyLoadResult(result)) toast('Archivo DXF recargado.', 'ok', 2200);
+    if (applyLoadResult(result)) window.U.toast(t('toast.reloaded'), 'ok', 2200);
   }
 
   async function loadExample() {
     const result = await window.api.loadExample();
-    if (applyLoadResult(result)) toast('Ejemplo cargado: ejemplo_pieza.dxf', 'ok', 2600);
+    if (applyLoadResult(result)) {
+      window.U.toast(t('toast.exampleLoaded'), 'ok', 2600);
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -232,24 +358,45 @@
     const badge = $('safetyBadge');
     if (!status) {
       badge.dataset.status = 'none';
-      badge.textContent = 'Seguridad: sin calcular';
+      badge.textContent = t('safety.none');
       return;
     }
     const icons = { SEGURO: '✔', ADVERTENCIA: '⚠', PELIGRO: '✖' };
     badge.dataset.status = status;
-    badge.textContent = `Seguridad: ${status} ${icons[status] || ''}`.trim();
+    badge.textContent = t('safety.status', {
+      status: t(`safety.${status}`),
+      icon: icons[status] || '',
+    }).trim();
   }
 
   function setBusy(busy) {
     state.busy = busy;
     $('btnGenerate').disabled = busy;
-    $('btnGenerate').textContent = busy ? '⏳ Generando...' : '🚀 GENERAR G-CODE SEGURO';
+    $('btnGenerate').textContent = busy ? t('actions.generating') : t('actions.generate');
+  }
+
+  /** Pinta la línea de estadísticas del programa a partir del último cálculo. */
+  function renderStats() {
+    const view = state.statsView;
+    if (!view || !view.stats) {
+      $('gcodeStats').textContent = t('gcode.stats.empty');
+      return;
+    }
+    const { stats, twoD, status } = view;
+    $('gcodeStats').textContent = t('stats.summary', {
+      blocks: stats.totalCommands,
+      cut: stats.cutDistance,
+      rapid: stats.rapidDistance,
+      time: stats.timeTotalMin,
+      mode: twoD ? t('stats.mode2d') : t('stats.passes', { count: stats.numPasses }),
+      status: t(`safety.${status}`),
+    });
   }
 
   async function generate() {
     if (state.busy) return;
     if (!state.payload) {
-      toast('Cargue primero un archivo DXF.', 'warn');
+      window.U.toast(t('toast.generateNoDxf'), 'warn');
       return;
     }
 
@@ -257,8 +404,8 @@
     try {
       const result = await window.api.generate(requestPayload());
       if (!result.ok) {
-        toast(result.error || 'No se pudo generar el código G.', 'error', 7000);
-        $('statusText').textContent = 'Error en la generación de código G.';
+        window.U.toast(result.error || t('toast.generateError'), 'error', 7000);
+        setStatus('status.generationError');
         return;
       }
 
@@ -270,9 +417,9 @@
       $('gcodeText').scrollTop = 0;
 
       const stats = result.stats;
-      $('gcodeStats').textContent = `${stats.totalCommands} bloques · `
-        + `corte ${stats.cutDistance} mm · rápido ${stats.rapidDistance} mm · `
-        + `${stats.timeTotalMin} min · ${stats.numPasses} pasadas · ${result.safety.status}`;
+      const twoD = Boolean(result.params && result.params.twoDMode);
+      state.statsView = { stats, twoD, status: result.safety.status };
+      renderStats();
 
       setSafety(result.safety.status);
 
@@ -283,16 +430,24 @@
       );
       if (result.zero) cadView.setZero(result.zero);
 
-      $('statusText').textContent = `Código G generado · ${stats.totalCommands} bloques · `
-        + `${result.safety.status}`;
+      setStatus('status.generated', {
+        blocks: stats.totalCommands,
+        status: t(`safety.${result.safety.status}`),
+      });
 
       const type = result.safety.status === 'PELIGRO' ? 'error'
         : (result.safety.status === 'ADVERTENCIA' ? 'warn' : 'ok');
-      toast(`Código G generado con éxito.\n`
-        + `• Estado de seguridad: ${result.safety.status}\n`
-        + `• Pasadas en Z: ${stats.numPasses}\n`
-        + `• Tiempo estimado: ${stats.timeTotalMin} min\n`
-        + `• Profundidad Z: ${result.params ? result.params.targetDepth : ''} mm`, type, 5200);
+      const depthInfo = twoD
+        ? t('toast.generated2d')
+        : t('toast.generatedDepth', {
+          passes: stats.numPasses,
+          depth: result.params ? result.params.targetDepth : '',
+        });
+      window.U.toast(t('toast.generated', {
+        status: t(`safety.${result.safety.status}`),
+        depth: depthInfo,
+        time: stats.timeTotalMin,
+      }), type, 5200);
 
       switchTab('sim');
     } finally {
@@ -302,50 +457,50 @@
 
   async function saveGcode() {
     if (!state.gcode) {
-      toast('Genere primero el código G antes de guardar.', 'warn');
+      window.U.toast(t('toast.generateFirst'), 'warn');
       return;
     }
     const result = await window.api.saveGcode(state.gcode);
     if (result.canceled) return;
     if (!result.ok) {
-      toast(result.error || 'No se pudo guardar el archivo.', 'error', 6000);
+      window.U.toast(result.error || t('toast.saveError'), 'error', 6000);
       return;
     }
     const fileName = result.filePath.split(/[\\/]/).pop();
-    $('statusText').textContent = `G-Code guardado en ${fileName}`;
-    toast(`Archivo guardado:\n${result.filePath}`, 'ok', 4200);
+    setStatus('status.saved', { file: fileName });
+    window.U.toast(t('toast.saved', { path: result.filePath }), 'ok', 4200);
   }
 
   async function exportReport() {
     if (!state.safety) {
-      toast('Genere primero el código G.', 'warn');
+      window.U.toast(t('toast.generateFirstReport'), 'warn');
       return;
     }
     const result = await window.api.exportReport(state.safety.reportText);
     if (result.canceled) return;
     if (!result.ok) {
-      toast(result.error || 'No se pudo exportar el informe.', 'error', 6000);
+      window.U.toast(result.error || t('toast.reportError'), 'error', 6000);
       return;
     }
-    toast(`Informe exportado:\n${result.filePath}`, 'ok', 4200);
+    window.U.toast(t('toast.reportExported', { path: result.filePath }), 'ok', 4200);
   }
 
   async function copyGcode() {
     if (!state.gcode) {
-      toast('No hay código G para copiar.', 'warn');
+      window.U.toast(t('toast.noGcode'), 'warn');
       return;
     }
     await window.api.copyText(state.gcode);
-    toast('Código G copiado al portapapeles.', 'ok', 2200);
+    window.U.toast(t('toast.copied'), 'ok', 2200);
   }
 
   function showSafety() {
     if (!state.safety) {
-      toast('Genere primero el código G para inspeccionar su seguridad.', 'warn');
+      window.U.toast(t('toast.generateFirstSafety'), 'warn');
       return;
     }
     const status = state.safety.status;
-    showModal('Informe de verificación de seguridad CNC', state.safety.reportText, {
+    showModal(t('safety.report.windowTitle'), state.safety.reportText, {
       mono: status !== 'SEGURO',
     });
   }
@@ -354,59 +509,17 @@
   // Ayuda
   // ---------------------------------------------------------------------------
 
-  const HELP_TEXT = [
-    'GUÍA DE TRAYECTORIAS SEGURAS CNC 2D',
-    '',
-    '1. Planos de seguridad Z',
-    '   • Z Seguro (Clearance): altura a la que se ejecutan todos los movimientos',
-    '     rápidos G0. Evita mordazas, tornillos y fijaciones.',
-    '   • Z Aproximación (Retract): altura intermedia antes de penetrar a avance',
-    '     controlado.',
-    '',
-    '2. Regla Inside-First (interiores primero)',
-    '   • El programa detecta agujeros y cajeras interiores y los mecaniza ANTES',
-    '     que el perímetro exterior. Si se corta el exterior primero, la pieza se',
-    '     suelta y puede causar una colisión.',
-    '',
-    '3. Pasadas múltiples',
-    '   • La profundidad total se reparte en capas uniformes que nunca superan el',
-    '     paso por pasada (stepdown), protegiendo la fresa.',
-    '',
-    '4. Pestañas de sujeción',
-    '   • Dejan pequeños puentes de material en la última pasada para evitar que la',
-    '     pieza se proyecte al terminar el corte.',
-    '',
-    '5. Compensación de radio de fresa',
-    '   • Perfil exterior: desplaza el filo hacia fuera (+R).',
-    '   • Perfil interior: desplaza el filo hacia dentro (-R).',
-    '   • Sobre línea: corta directamente sobre el vector (grabado, láser, plasma).',
-    '',
-    '6. Comprobaciones automáticas antes de volar',
-    '   • Ningún G0 en XY por debajo de Z seguro.',
-    '   • Husillo encendido (M3) antes de tocar material.',
-    '   • Penetración en Z a avance controlado.',
-    '   • Profundidad mínima dentro de la programada.',
-    '   • Retracción final y apagado (M5).',
-  ].join('\n');
-
   function showHelp() {
-    showModal('Guía de trayectorias seguras', HELP_TEXT, { mono: true });
+    showModal(t('help.title'), t('help.text'), { mono: true });
   }
 
   function showAbout() {
     const info = state.info || { version: '—', electron: '—', platform: '—' };
-    showModal(
-      'Acerca de',
-      `CAD-CAM 2D CNC · Generador de trayectorias seguras\n`
-      + `Versión ${info.version}\n\n`
-      + 'Suite CAD-CAM multiplataforma construida con Electron.\n'
-      + 'Importa DXF (líneas, arcos, círculos, polilíneas con bulges, splines y\n'
-      + 'elipses), genera código G con compensación de herramienta, pasadas\n'
-      + 'múltiples, pestañas de sujeción y verificación de seguridad previa.\n\n'
-      + 'Compatible con GRBL, Candle, CNCjs, UGS, Mach3/4, LinuxCNC, Marlin y\n'
-      + 'láser/plasma 2D.\n\n'
-      + `Electron ${info.electron} · Plataforma ${info.platform}`,
-    );
+    showModal(t('about.title'), t('about.text', {
+      version: info.version,
+      electron: info.electron,
+      platform: info.platform,
+    }));
   }
 
   // ---------------------------------------------------------------------------
@@ -435,15 +548,23 @@
     const depth = Math.abs(Number($('targetDepth').value));
     const stepdown = Math.abs(Number($('stepdown').value));
     const label = $('passesInfo');
+    if (!label) return;
+
+    if ($('twoDMode').checked) {
+      label.textContent = t('passes.twoD');
+      return;
+    }
 
     if (Number.isFinite(depth) && Number.isFinite(stepdown) && stepdown > 0.001 && depth > 0.001) {
       const passes = Math.max(1, Math.ceil(depth / stepdown));
       const actual = depth / passes;
       const values = [];
       for (let i = 1; i <= passes; i += 1) values.push(`-${(actual * i).toFixed(2)}`);
-      label.textContent = `Cálculo: ${passes} pasada${passes === 1 ? '' : 's'} en Z (${values.join(', ')} mm)`;
+      label.textContent = passes === 1
+        ? t('passes.calcOne', { values: values.join(', ') })
+        : t('passes.calcMany', { count: passes, values: values.join(', ') });
     } else {
-      label.textContent = 'Cálculo: 1 pasada';
+      label.textContent = t('passes.one');
     }
   }
 
@@ -478,18 +599,26 @@
   }
 
   // ---------------------------------------------------------------------------
-  // Inicialización
+  // Idioma
   // ---------------------------------------------------------------------------
 
-  function fillSelects(info) {
-    const zeroSelect = $('workZero');
-    for (const mode of info.zeroModes) {
+  /** Reconstruye el selector de cero pieza conservando el valor elegido. */
+  function rebuildZeroSelect() {
+    const select = $('workZero');
+    if (!select || !state.info) return;
+    const current = select.value || state.info.defaults.workZero;
+    select.textContent = '';
+    for (const mode of state.info.zeroModes) {
       const option = document.createElement('option');
       option.value = mode.value;
       option.textContent = mode.label;
-      zeroSelect.appendChild(option);
+      select.appendChild(option);
     }
+    select.value = current;
+  }
 
+  /** Rellena los selectores que no dependen del idioma. */
+  function fillPostProfiles(info) {
     const postSelect = $('postProfile');
     for (const profile of info.postProfiles) {
       const option = document.createElement('option');
@@ -498,6 +627,49 @@
       postSelect.appendChild(option);
     }
   }
+
+  /**
+   * Aplica un diccionario de idioma y repinta todo lo dinámico.
+   * @param {{language?:string, messages?:Object, languages?:Array, operationLabels?:Object,
+   *   operationDescriptions?:Object, zeroModes?:Array}} payload
+   */
+  function applyLanguage(payload = {}) {
+    I18n.setLanguage(payload);
+    if (Array.isArray(payload.languages)) state.languages = payload.languages;
+
+    if (state.info) {
+      if (payload.operationLabels) state.info.operationLabels = payload.operationLabels;
+      if (payload.operationDescriptions) {
+        state.info.operationDescriptions = payload.operationDescriptions;
+      }
+      if (payload.zeroModes) state.info.zeroModes = payload.zeroModes;
+    }
+
+    I18n.apply();                 // Textos estáticos del HTML.
+    rebuildZeroSelect();
+    renderLayers();
+    updateModalCodesSummary();
+    updatePassesInfo();
+    setStatus(state.statusKey, state.statusVars);
+    setSafety(state.safety ? state.safety.status : null);
+    setBusy(state.busy);
+    renderStats();
+    updateWindowTitle();
+
+    if (state.fileInfoVars) {
+      $('fileInfo').textContent = t('fileInfo.loaded', state.fileInfoVars);
+    }
+
+    if (cadView) cadView.draw();
+    if (simView) {
+      simView.updateTelemetry();
+      simView.draw();
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Inicialización
+  // ---------------------------------------------------------------------------
 
   function bindEvents() {
     $('btnOpen').addEventListener('click', openDxf);
@@ -520,8 +692,20 @@
       if (input) input.addEventListener('input', onParamChange);
     }
     $('tabsEnabled').addEventListener('change', onParamChange);
+    $('twoDMode').addEventListener('change', () => {
+      applyTwoDModeUI();
+      onParamChange();
+    });
     $('workZero').addEventListener('change', onParamChange);
     $('postProfile').addEventListener('change', onParamChange);
+
+    $('btnModalCodes').addEventListener('click', openModalCodes);
+    $('modalCodesApply').addEventListener('click', applyModalCodes);
+    $('modalCodesCancel').addEventListener('click', closeModalCodes);
+    $('modalCodesClose').addEventListener('click', closeModalCodes);
+    $('modalCodes').addEventListener('click', (event) => {
+      if (event.target.id === 'modalCodes') closeModalCodes();
+    });
 
     for (const tab of document.querySelectorAll('.tab')) {
       tab.addEventListener('click', () => switchTab(tab.dataset.tab));
@@ -539,7 +723,9 @@
       if (event.target.id === 'modal') hideModal();
     });
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') hideModal();
+      if (event.key !== 'Escape') return;
+      hideModal();
+      closeModalCodes();
     });
 
     window.addEventListener('resize', debounce(() => {
@@ -548,13 +734,31 @@
     }, 120));
 
     window.api.onMenuAction(handleMenu);
+    if (typeof window.api.onLanguageChange === 'function') {
+      window.api.onLanguageChange((payload) => applyLanguage(payload));
+    }
   }
 
   async function init() {
     const info = await window.api.info();
     state.info = info;
+    state.languages = info.languages || [];
 
-    fillSelects(info);
+    // Idioma primero: deja los diccionarios listos para cualquier texto.
+    applyLanguage({
+      language: info.language,
+      messages: info.messages,
+      languages: info.languages,
+      operationLabels: info.operationLabels,
+      operationDescriptions: info.operationDescriptions,
+      zeroModes: info.zeroModes,
+    });
+
+    fillPostProfiles(info);
+    rebuildZeroSelect();
+    state.modalCodes = { ...EMPTY_MODAL_CODES, ...(info.defaultModalCodes || {}) };
+    writeModalCodesForm();
+    updateModalCodesSummary();
     writeParams(info.defaults);
     updatePassesInfo();
 
@@ -584,7 +788,8 @@
 
     // Traza de arranque: útil para diagnosticar problemas de carga en campo.
     console.info(
-      `APP_READY v${info.version} · entidades=${state.payload ? state.payload.entityCount : 0}`
+      `APP_READY v${info.version} · lang=${I18n.language}`
+      + ` · entidades=${state.payload ? state.payload.entityCount : 0}`
       + ` · capas=${Object.keys(state.layerConfigs).length}`,
     );
   }
@@ -597,7 +802,7 @@
     booted = true;
     init().catch((error) => {
       console.error(error);
-      toast(`Error al iniciar la aplicación: ${error.message}`, 'error', 8000);
+      window.U.toast(t('toast.initError', { message: error.message }), 'error', 8000);
     });
   });
 }());

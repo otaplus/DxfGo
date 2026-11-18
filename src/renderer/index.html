@@ -15,27 +15,28 @@
       <div class="sidebar-scroll">
 
         <section class="panel">
-          <h2 class="panel-title">1. Archivo DXF</h2>
+          <h2 class="panel-title" data-i18n="panel.file">1. Archivo DXF</h2>
           <div class="btn-row">
-            <button class="btn btn-primary grow" id="btnOpen">📂 Abrir DXF...</button>
-            <button class="btn" id="btnReload" title="Volver a leer el archivo actual">🔄</button>
+            <button class="btn btn-primary grow" id="btnOpen" data-i18n="btn.open">📂 Abrir DXF...</button>
+            <button class="btn" id="btnReload" title="Volver a leer el archivo actual"
+                    data-i18n-title="btn.reloadTitle">🔄</button>
           </div>
-          <p class="hint-text" id="fileInfo">Ningún archivo cargado</p>
+          <p class="hint-text" id="fileInfo" data-i18n="fileInfo.none">Ningún archivo cargado</p>
         </section>
 
         <section class="panel">
-          <h2 class="panel-title">2. Capas y Operaciones CAM</h2>
-          <p class="hint-text">Asigna operaciones de mecanizado por capa:</p>
+          <h2 class="panel-title" data-i18n="panel.layers">2. Capas y Operaciones CAM</h2>
+          <p class="hint-text" data-i18n="panel.layersHint">Asigna operaciones de mecanizado por capa:</p>
           <div id="layerList" class="layer-list">
-            <p class="hint-text">Sin capas cargadas.</p>
+            <p class="hint-text" data-i18n="layers.empty">Sin capas con entidades.</p>
           </div>
         </section>
 
         <section class="panel">
-          <h2 class="panel-title">3. Herramienta y Seguridad Z</h2>
+          <h2 class="panel-title" data-i18n="panel.tool">3. Herramienta y Seguridad Z</h2>
 
           <div class="row">
-            <label for="toolDiameter">Diámetro fresa (mm)</label>
+            <label for="toolDiameter" data-i18n="field.toolDiameter">Diámetro fresa (mm)</label>
             <input type="number" id="toolDiameter" step="0.001" min="0.05" max="100" list="diameterPresets" />
             <datalist id="diameterPresets">
               <option value="1.5"></option>
@@ -50,129 +51,150 @@
           </div>
 
           <div class="row">
-            <label for="safeZ">Z seguro (G0) (mm)</label>
+            <label for="safeZ" data-i18n="field.safeZ">Z seguro (G0) (mm)</label>
             <input type="number" id="safeZ" step="0.1" min="0" max="500" />
           </div>
 
           <div class="row">
-            <label for="retractZ">Z aproximación (mm)</label>
+            <label for="retractZ" data-i18n="field.retractZ">Z aproximación (mm)</label>
             <input type="number" id="retractZ" step="0.1" min="-100" max="500" />
           </div>
 
           <div class="row">
-            <label for="targetDepth">Profundidad total (mm)</label>
+            <label for="targetDepth" data-i18n="field.targetDepth">Profundidad total (mm)</label>
             <input type="number" id="targetDepth" step="0.1" min="-500" max="0" />
           </div>
 
           <div class="row">
-            <label for="stepdown">Paso por pasada (mm)</label>
+            <label for="stepdown" data-i18n="field.stepdown">Paso por pasada (mm)</label>
             <input type="number" id="stepdown" step="0.1" min="0.01" max="500" />
           </div>
 
-          <p class="passes-info" id="passesInfo">Cálculo: 2 pasadas en Z</p>
+          <p class="passes-info" id="passesInfo" data-i18n="passes.initial">Cálculo: 2 pasadas en Z</p>
         </section>
 
         <section class="panel">
-          <h2 class="panel-title">4. Avances y Husillo</h2>
+          <h2 class="panel-title" data-i18n="panel.feeds">4. Avances y Husillo</h2>
 
           <div class="row">
-            <label for="cutFeed">Avance corte XY (mm/min)</label>
+            <label for="cutFeed" data-i18n="field.cutFeed">Avance corte XY (mm/min)</label>
             <input type="number" id="cutFeed" step="10" min="1" max="60000" />
           </div>
 
           <div class="row">
-            <label for="plungeFeed">Avance penetración Z (mm/min)</label>
+            <label for="plungeFeed" data-i18n="field.plungeFeed">Avance penetración Z (mm/min)</label>
             <input type="number" id="plungeFeed" step="10" min="1" max="60000" />
           </div>
 
           <div class="row">
-            <label for="spindleRpm">Velocidad husillo (RPM)</label>
+            <label for="spindleRpm" data-i18n="field.spindleRpm">Velocidad husillo (RPM)</label>
             <input type="number" id="spindleRpm" step="100" min="0" max="100000" />
           </div>
         </section>
 
         <section class="panel">
-          <h2 class="panel-title">5. Pestañas de Sujeción</h2>
+          <h2 class="panel-title" data-i18n="panel.tabs">5. Pestañas de Sujeción</h2>
 
           <label class="check">
             <input type="checkbox" id="tabsEnabled" />
-            <span>Activar pestañas de fijación de pieza</span>
+            <span data-i18n="tabs.enable">Activar pestañas de fijación de pieza</span>
           </label>
 
           <div class="row">
-            <label for="tabCount">Cantidad de pestañas</label>
+            <label for="tabCount" data-i18n="field.tabCount">Cantidad de pestañas</label>
             <input type="number" id="tabCount" step="1" min="1" max="12" />
           </div>
 
           <div class="row">
-            <label for="tabWidth">Ancho de pestaña (mm)</label>
+            <label for="tabWidth" data-i18n="field.tabWidth">Ancho de pestaña (mm)</label>
             <input type="number" id="tabWidth" step="0.1" min="0.5" max="200" />
           </div>
 
           <div class="row">
-            <label for="tabHeight">Altura sobre fondo (mm)</label>
+            <label for="tabHeight" data-i18n="field.tabHeight">Altura sobre fondo (mm)</label>
             <input type="number" id="tabHeight" step="0.1" min="0.1" max="100" />
           </div>
         </section>
 
         <section class="panel">
-          <h2 class="panel-title">6. Cero Pieza y Postprocesador</h2>
+          <h2 class="panel-title" data-i18n="panel.zero">6. Cero Pieza y Postprocesador</h2>
 
           <div class="row">
-            <label for="workZero">Cero de trabajo</label>
+            <label for="workZero" data-i18n="field.workZero">Cero de trabajo</label>
             <select id="workZero"></select>
           </div>
 
           <div class="row">
-            <label for="postProfile">Controlador CNC</label>
+            <label for="postProfile" data-i18n="field.postProfile">Controlador CNC</label>
             <select id="postProfile"></select>
           </div>
+
+          <label class="check">
+            <input type="checkbox" id="twoDMode" />
+            <span data-i18n="twoD.label">Modo 2D: eliminar el eje Z del programa</span>
+          </label>
+          <p class="hint-text" data-i18n="twoD.hint">
+            Para antorchas de oxicorte que no levantan el eje Z: omite todas las
+            palabras Z, las pasadas en profundidad y las pestañas.
+          </p>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title" data-i18n="panel.modalCodes">7. Códigos Modales</h2>
+          <p class="hint-text" data-i18n="panel.modalCodesHint">
+            Inserte comandos antes o después de cada rápido G00 y de cada arco
+            G02/G03 (por ejemplo, para abrir o cerrar el oxígeno).
+          </p>
+          <button class="btn" id="btnModalCodes" data-i18n="btn.modalCodes">⚙ Configurar códigos modales...</button>
+          <p class="hint-text" id="modalCodesSummary" data-i18n="modalCodes.none">Sin códigos configurados.</p>
         </section>
 
       </div>
 
       <div class="actions">
-        <button class="btn btn-generate" id="btnGenerate">🚀 GENERAR G-CODE SEGURO</button>
-        <button class="btn btn-save" id="btnSaveGcode">💾 Guardar Programa CNC...</button>
-        <button class="btn btn-safety" id="btnSafety">🛡 Informe de Seguridad</button>
+        <button class="btn btn-generate" id="btnGenerate" data-i18n="actions.generate">🚀 GENERAR G-CODE SEGURO</button>
+        <button class="btn btn-save" id="btnSaveGcode" data-i18n="actions.save">💾 Guardar Programa CNC...</button>
+        <button class="btn btn-safety" id="btnSafety" data-i18n="actions.safety">🛡 Informe de Seguridad</button>
       </div>
     </aside>
 
     <!-- ================= ÁREA DE TRABAJO ================= -->
     <main class="workspace">
       <nav class="tabs" id="tabs">
-        <button class="tab active" data-tab="cad">📐 Visor CAD / CAM</button>
-        <button class="tab" data-tab="gcode">📝 Código G Generado</button>
-        <button class="tab" data-tab="sim">🎮 Simulador CNC 2D</button>
+        <button class="tab active" data-tab="cad" data-i18n="tabs.cad">📐 Visor CAD / CAM</button>
+        <button class="tab" data-tab="gcode" data-i18n="tabs.gcode">📝 Código G Generado</button>
+        <button class="tab" data-tab="sim" data-i18n="tabs.sim">🎮 Simulador CNC 2D</button>
       </nav>
 
       <!-- Visor CAD -->
       <section class="tab-panel active" id="panel-cad">
         <div class="toolbar">
-          <button class="btn small" id="cadZoomIn" title="Acercar">🔍+</button>
-          <button class="btn small" id="cadZoomOut" title="Alejar">🔍-</button>
-          <button class="btn small" id="cadFit" title="Ajustar vista">🏠 Ajustar vista</button>
+          <button class="btn small" id="cadZoomIn" title="Acercar" data-i18n-title="cad.zoomIn">🔍+</button>
+          <button class="btn small" id="cadZoomOut" title="Alejar" data-i18n-title="cad.zoomOut">🔍-</button>
+          <button class="btn small" id="cadFit" title="Ajustar vista" data-i18n-title="cad.fitTitle"
+                  data-i18n="cad.fit">🏠 Ajustar vista</button>
           <label class="check inline">
             <input type="checkbox" id="showToolpaths" checked />
-            <span>Mostrar trayectorias compensadas</span>
+            <span data-i18n="cad.showToolpaths">Mostrar trayectorias compensadas</span>
           </label>
-          <span class="coords" id="cadCoords">X: 0.000 mm | Y: 0.000 mm</span>
+          <span class="coords" id="cadCoords" data-i18n="cad.coordsStart">X: 0.000 mm | Y: 0.000 mm</span>
         </div>
         <div class="canvas-wrap">
           <canvas id="cadCanvas"></canvas>
-          <div class="canvas-hint" id="cadHint">Haz clic en «Abrir DXF...» para cargar una pieza.</div>
+          <div class="canvas-hint" id="cadHint" data-i18n="cad.hint">Haz clic en «Abrir DXF...» para cargar una pieza.</div>
         </div>
       </section>
 
       <!-- Código G -->
       <section class="tab-panel" id="panel-gcode">
         <div class="toolbar">
-          <span class="stats" id="gcodeStats">Genere el código G para visualizar estadísticas.</span>
-          <button class="btn small" id="btnCopyGcode">📋 Copiar</button>
-          <button class="btn small" id="btnSaveGcode2">💾 Guardar como...</button>
+          <span class="stats" id="gcodeStats" data-i18n="gcode.stats.empty">Genere el código G para visualizar estadísticas.</span>
+          <button class="btn small" id="btnCopyGcode" data-i18n="gcode.copy">📋 Copiar</button>
+          <button class="btn small" id="btnSaveGcode2" data-i18n="gcode.saveAs">💾 Guardar como...</button>
         </div>
         <div class="gcode-wrap">
           <textarea id="gcodeText" class="gcode-text" readonly spellcheck="false"
+                    data-i18n-placeholder="gcode.placeholder"
                     placeholder="Aún no se ha generado ningún programa."></textarea>
         </div>
       </section>
@@ -181,31 +203,31 @@
       <section class="tab-panel" id="panel-sim">
         <div class="toolbar">
           <div class="sim-buttons">
-            <button class="btn small" id="simStart">▶ Iniciar</button>
-            <button class="btn small" id="simPause">⏸ Pausar</button>
-            <button class="btn small" id="simStop">⏹ Detener</button>
-            <button class="btn small" id="simStep">⏭ Paso</button>
-            <button class="btn small" id="simReset">⟳ Reiniciar</button>
+            <button class="btn small" id="simStart" data-i18n="sim.start">▶ Iniciar</button>
+            <button class="btn small" id="simPause" data-i18n="sim.pause">⏸ Pausar</button>
+            <button class="btn small" id="simStop" data-i18n="sim.stop">⏹ Detener</button>
+            <button class="btn small" id="simStep" data-i18n="sim.step">⏭ Paso</button>
+            <button class="btn small" id="simReset" data-i18n="sim.reset">⟳ Reiniciar</button>
           </div>
           <label class="speed">
-            Velocidad
+            <span data-i18n="sim.speed">Velocidad</span>
             <input type="number" id="simSpeed" min="1" max="50" step="1" value="5" />
           </label>
           <label class="scrub">
-            Avance
+            <span data-i18n="sim.progress">Avance</span>
             <input type="range" id="simProgress" min="0" max="100" step="0.1" value="0" />
           </label>
         </div>
         <div class="sim-telemetry">
-          <span id="simTelemetry">X: 0.000 | Y: 0.000 | Z: 0.000 | T: 0.0s</span>
+          <span id="simTelemetry" data-i18n="sim.telemetryStart">X: 0.000 | Y: 0.000 | Z: 0.000 | T: 0.0s</span>
         </div>
         <div class="sim-body">
           <div class="canvas-wrap">
             <canvas id="simCanvas"></canvas>
-            <div class="canvas-hint" id="simHint">Genere el código G para inicializar el simulador.</div>
+            <div class="canvas-hint" id="simHint" data-i18n="sim.hint">Genere el código G para inicializar el simulador.</div>
           </div>
           <div class="code-panel">
-            <h3>Bloques G-Code en ejecución</h3>
+            <h3 data-i18n="sim.blocks">Bloques G-Code en ejecución</h3>
             <div class="code-list" id="simCodeList"></div>
           </div>
         </div>
@@ -215,8 +237,8 @@
 
   <!-- ================= BARRA DE ESTADO ================= -->
   <footer class="statusbar">
-    <span id="statusText">Listo. Abra un archivo DXF para comenzar.</span>
-    <span class="badge" id="safetyBadge" data-status="none">Seguridad: sin calcular</span>
+    <span id="statusText" data-i18n="status.ready">Listo. Abra un archivo DXF para comenzar.</span>
+    <span class="badge" id="safetyBadge" data-status="none" data-i18n="safety.none">Seguridad: sin calcular</span>
   </footer>
 
   <!-- Avisos flotantes -->
@@ -227,15 +249,66 @@
     <div class="modal">
       <header>
         <h2 id="modalTitle">Título</h2>
-        <button class="btn icon" id="modalClose" aria-label="Cerrar">✕</button>
+        <button class="btn icon" id="modalClose" aria-label="Cerrar"
+                data-i18n-aria-label="modal.close">✕</button>
       </header>
       <div class="modal-body" id="modalBody"></div>
       <footer>
-        <button class="btn" id="modalOk">Cerrar</button>
+        <button class="btn" id="modalOk" data-i18n="modal.ok">Cerrar</button>
       </footer>
     </div>
   </div>
 
+  <!-- Diálogo de códigos modales -->
+  <div class="modal-backdrop hidden" id="modalCodes">
+    <div class="modal modal-codes">
+      <header>
+        <h2 data-i18n="modalCodes.title">Códigos modales por movimiento</h2>
+        <button class="btn icon" id="modalCodesClose" aria-label="Cerrar"
+                data-i18n-aria-label="modal.close">✕</button>
+      </header>
+      <div class="modal-body">
+        <p class="hint-text" data-i18n="modalCodes.hint">
+          Se insertan tal cual en el programa generado: un fragmento por línea.
+          Los códigos para G00 también se aplican a G0; los de arco, a G02 y G03.
+          El retorno final a origen no dispara códigos (así no se reactiva el
+          oxígeno tras el apagado). Nota: este generador convierte los arcos en
+          segmentos G1, por lo que los códigos de arco solo se aplican si el
+          programa contiene G02/G03.
+        </p>
+
+        <label class="code-field" for="codesBeforeG0">
+          <span data-i18n="modalCodes.beforeG0">Antes de G00 (rápido)</span>
+          <textarea id="codesBeforeG0" rows="3" spellcheck="false"
+                    data-i18n-placeholder="modalCodes.placeholder.beforeG0"
+                    placeholder="M5 ; apagar oxígeno antes del rápido"></textarea>
+        </label>
+
+        <label class="code-field" for="codesAfterG0">
+          <span data-i18n="modalCodes.afterG0">Después de G00 (rápido)</span>
+          <textarea id="codesAfterG0" rows="3" spellcheck="false"
+                    data-i18n-placeholder="modalCodes.placeholder.afterG0"
+                    placeholder="M3 ; encender oxígeno tras el rápido"></textarea>
+        </label>
+
+        <label class="code-field" for="codesBeforeArc">
+          <span data-i18n="modalCodes.beforeArc">Antes de G02 / G03 (arco)</span>
+          <textarea id="codesBeforeArc" rows="3" spellcheck="false"></textarea>
+        </label>
+
+        <label class="code-field" for="codesAfterArc">
+          <span data-i18n="modalCodes.afterArc">Después de G02 / G03 (arco)</span>
+          <textarea id="codesAfterArc" rows="3" spellcheck="false"></textarea>
+        </label>
+      </div>
+      <footer>
+        <button class="btn" id="modalCodesCancel" data-i18n="modalCodes.cancel">Cancelar</button>
+        <button class="btn btn-primary" id="modalCodesApply" data-i18n="modalCodes.apply">Aplicar</button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="i18n.js"></script>
   <script src="util.js"></script>
   <script src="cad-view.js"></script>
   <script src="sim-view.js"></script>

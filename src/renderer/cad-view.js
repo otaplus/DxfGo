@@ -291,11 +291,19 @@
       ctx.font = '11px Arial, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText(`Ancho: ${bounds.width.toFixed(2)} mm`, (x1 + x2) / 2, y1 + 8);
+      ctx.fillText(
+        window.I18n.t('cad.width', { value: bounds.width.toFixed(2) }),
+        (x1 + x2) / 2,
+        y1 + 8,
+      );
 
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(`Alto: ${bounds.height.toFixed(2)} mm`, x2 + 10, (y1 + y2) / 2);
+      ctx.fillText(
+        window.I18n.t('cad.height', { value: bounds.height.toFixed(2) }),
+        x2 + 10,
+        (y1 + y2) / 2,
+      );
     }
 
     _drawOrigin(ctx, scale, ox, oy) {
@@ -348,7 +356,7 @@
 
       ctx.fillStyle = '#ffff00';
       ctx.font = '11px "Segoe UI", Arial, sans-serif';
-      ctx.fillText('Cero (0,0)', x + 12, y + 14);
+      ctx.fillText(window.I18n.t('cad.zeroLabel'), x + 12, y + 14);
     }
 
     /** Convierte coordenadas de pantalla a milímetros respecto al cero pieza. */

@@ -14,6 +14,7 @@
 const { GeometryProcessor } = require('./geometry');
 const { PostProcessor } = require('./postprocessor');
 const { DEFAULT_PARAMS } = require('./constants');
+const { translator } = require('./locales');
 
 /** Un movimiento de herramienta. */
 class ToolpathSegment {
@@ -40,10 +41,16 @@ class CAMParameters {
 
 /** Motor de generación de código G. */
 class CAMEngine {
-  constructor(params = new CAMParameters()) {
+  /**
+   * @param {CAMParameters} [params]
+   * @param {(key:string, vars?:Object<string, unknown>) => string} [t]
+   *   Traductor de los comentarios del programa (por defecto, español).
+   */
+  constructor(params = new CAMParameters(), t) {
     this.params = params;
+    this.t = typeof t === 'function' ? t : translator();
     this.geomProcessor = new GeometryProcessor();
-    this.postprocessor = new PostProcessor(this.params.postProfile);
+    this.postprocessor = new PostProcessor(this.params.postProfile, 3, this.t);
     this.toolpaths = [];
     this.stats = {};
   }
@@ -102,7 +109,8 @@ class CAMEngine {
    * @returns {string}
    */
   generateGcode(rawEntities, bounds, layerConfigs = {}) {
-    this.postprocessor = new PostProcessor(this.params.postProfile);
+    const { t } = this;
+    this.postprocessor = new PostProcessor(this.params.postProfile, 3, t);
     const [zeroX, zeroY] = this.getZeroOffset(bounds);
     this.toolpaths = [];
 
@@ -115,7 +123,7 @@ class CAMEngine {
 
     if (!activeEntities.length) {
       this.stats = {};
-      return '; Error: No hay entidades activas o capas visibles para mecanizar.\n';
+      return `; Error: ${t('gcode.error.noEntities')}\n`;
     }
 
     // 2. Encadenar perfiles continuos.
@@ -128,7 +136,11 @@ class CAMEngine {
     const orderedContours = this.geomProcessor.sortContoursSafely(contours, [0.0, 0.0]);
 
     // 5. Pasadas en Z.
-    const zPasses = this.calculateZPasses();
+    // En modo 2D no hay eje Z: una sola pasada y sin pestañas (no pueden
+    // modularse sin movimiento vertical de la antorcha).
+    const twoD = Boolean(this.params.twoDMode);
+    const tabsEnabled = Boolean(this.params.tabsEnabled) && !twoD;
+    const zPasses = twoD ? [0.0] : this.calculateZPasses();
     const tabThresholdZ = this.params.targetDepth + this.params.tabHeight;
 
     const gcodeLines = [];
@@ -143,6 +155,7 @@ class CAMEngine {
       spindle_rpm: this.params.spindleRpm,
       spindle_dwell: this.params.spindleDwell,
       coolant: this.params.coolant,
+      two_d_mode: twoD,
     };
     gcodeLines.push(...this.postprocessor.getHeader(headerParams));
 
@@ -159,8 +172,8 @@ class CAMEngine {
 
       gcodeLines.push('');
       gcodeLines.push('; ------------------------------------------');
-      gcodeLines.push(`; Contorno ${contourIndex + 1}/${orderedContours.length} - Capa: '${contour.layer}'`);
-      gcodeLines.push(`; Operación: ${operation} | Nivel Anidado: ${contour.nestingLevel}`);
+      gcodeLines.push(`; ${t('gcode.comment.contour', { index: contourIndex + 1, total: orderedContours.length, layer: contour.layer })}`);
+      gcodeLines.push(`; ${t('gcode.comment.operation', { operation, nesting: contour.nestingLevel })}`);
       gcodeLines.push('; ------------------------------------------');
 
       // Taladrado: ciclo de penetración en el centro.
@@ -168,6 +181,15 @@ class CAMEngine {
         const center = contour.circleCenter || contour.points[0];
         const cx = center[0] - zeroX;
         const cy = center[1] - zeroY;
+
+        if (twoD) {
+          // Sin eje Z no hay ciclo de taladrado: se marca el punto de perforación.
+          gcodeLines.push(`G0 X${fixed3(cx)} Y${fixed3(cy)} ; ${t('gcode.comment.drillPoint2d')}`);
+          this.toolpaths.push(
+            new ToolpathSegment('G0', cx, cy, 0.0, this.params.rapidFeed),
+          );
+          continue;
+        }
 
         gcodeLines.push(`G0 Z${fixed3(this.params.safeZ)}`);
         gcodeLines.push(`G0 X${fixed3(cx)} Y${fixed3(cy)}`);
@@ -204,9 +226,9 @@ class CAMEngine {
         const startX = adjusted[0][0];
         const startY = adjusted[0][1];
 
-        // Pestañas solo en el contorno exterior cerrado.
+        // Pestañas solo en el contorno exterior cerrado y con eje Z disponible.
         let tabs = [];
-        if (this.params.tabsEnabled && contour.isClosed && contour.nestingLevel === 0) {
+        if (tabsEnabled && contour.isClosed && contour.nestingLevel === 0) {
           tabs = this.geomProcessor.generateTabs(
             adjusted,
             this.params.tabCount,
@@ -214,36 +236,55 @@ class CAMEngine {
           );
         }
 
-        // 1. Ir al punto inicial a Z Seguro.
-        gcodeLines.push(`G0 Z${fixed3(this.params.safeZ)} ; Asegurar altura libre`);
-        gcodeLines.push(`G0 X${fixed3(startX)} Y${fixed3(startY)} ; Posicionamiento XY`);
+        // 1. Ir al punto inicial (a Z Seguro salvo en modo 2D).
+        if (!twoD) {
+          gcodeLines.push(`G0 Z${fixed3(this.params.safeZ)} ; ${t('gcode.comment.ensureClearance')}`);
+        }
+        gcodeLines.push(`G0 X${fixed3(startX)} Y${fixed3(startY)} ; ${t('gcode.comment.positioningXY')}`);
         this.toolpaths.push(
-          new ToolpathSegment('G0', startX, startY, this.params.safeZ, this.params.rapidFeed),
+          new ToolpathSegment(
+            'G0',
+            startX,
+            startY,
+            twoD ? 0.0 : this.params.safeZ,
+            this.params.rapidFeed,
+          ),
         );
 
-        if (isLaser) {
-          // Modo láser / plasma: encendido, recorrido y apagado.
-          gcodeLines.push(`M3 S${this.params.laserPower} ; Encender antorcha / láser`);
+        if (twoD) {
+          // Corte 2D puro: un único recorrido XY, sin pasadas ni pestañas.
+          gcodeLines.push(`; ${t('gcode.comment.cut2d')}`);
+          gcodeLines.push(`M3 S${this.params.laserPower} ; ${t('gcode.comment.torchOn')}`);
           for (const p of adjusted.slice(1)) {
             gcodeLines.push(`G1 X${fixed3(p[0])} Y${fixed3(p[1])} F${Number(this.params.cutFeed).toFixed(1)}`);
             this.toolpaths.push(
               new ToolpathSegment('G1', p[0], p[1], 0.0, this.params.cutFeed),
             );
           }
-          gcodeLines.push('M5 ; Apagar antorcha / láser');
+          gcodeLines.push(`M5 ; ${t('gcode.comment.torchOff')}`);
+        } else if (isLaser) {
+          // Modo láser / plasma: encendido, recorrido y apagado.
+          gcodeLines.push(`M3 S${this.params.laserPower} ; ${t('gcode.comment.torchOn')}`);
+          for (const p of adjusted.slice(1)) {
+            gcodeLines.push(`G1 X${fixed3(p[0])} Y${fixed3(p[1])} F${Number(this.params.cutFeed).toFixed(1)}`);
+            this.toolpaths.push(
+              new ToolpathSegment('G1', p[0], p[1], 0.0, this.params.cutFeed),
+            );
+          }
+          gcodeLines.push(`M5 ; ${t('gcode.comment.torchOff')}`);
         } else {
           // Fresado con pasadas en Z.
-          gcodeLines.push(`G0 Z${fixed3(this.params.retractZ)} ; Aproximación rápida`);
+          gcodeLines.push(`G0 Z${fixed3(this.params.retractZ)} ; ${t('gcode.comment.approach')}`);
           this.toolpaths.push(
             new ToolpathSegment('G0', startX, startY, this.params.retractZ, this.params.rapidFeed),
           );
 
           for (let passIndex = 0; passIndex < zPasses.length; passIndex += 1) {
             const passZ = zPasses[passIndex];
-            gcodeLines.push(`; Pasada ${passIndex + 1}/${zPasses.length} a Z = ${fixed3(passZ)} mm`);
+            gcodeLines.push(`; ${t('gcode.comment.pass', { index: passIndex + 1, total: zPasses.length, z: fixed3(passZ) })}`);
 
             gcodeLines.push(
-              `G1 Z${fixed3(passZ)} F${Number(this.params.plungeFeed).toFixed(1)} ; Penetración controlada`,
+              `G1 Z${fixed3(passZ)} F${Number(this.params.plungeFeed).toFixed(1)} ; ${t('gcode.comment.plunge')}`,
             );
             this.toolpaths.push(
               new ToolpathSegment('G1', startX, startY, passZ, this.params.plungeFeed),
@@ -272,11 +313,11 @@ class CAMEngine {
 
                 if (inTab) {
                   gcodeLines.push(
-                    `G1 Z${fixed3(tabThresholdZ)} F${Number(this.params.cutFeed).toFixed(1)} ; Pestaña (Tab)`,
+                    `G1 Z${fixed3(tabThresholdZ)} F${Number(this.params.cutFeed).toFixed(1)} ; ${t('gcode.comment.tab')}`,
                   );
                   gcodeLines.push(`G1 X${fixed3(p2[0])} Y${fixed3(p2[1])} F${Number(this.params.cutFeed).toFixed(1)}`);
                   gcodeLines.push(
-                    `G1 Z${fixed3(passZ)} F${Number(this.params.plungeFeed).toFixed(1)} ; Retorno a corte`,
+                    `G1 Z${fixed3(passZ)} F${Number(this.params.plungeFeed).toFixed(1)} ; ${t('gcode.comment.tabReturn')}`,
                   );
                   this.toolpaths.push(
                     new ToolpathSegment('G1', p2[0], p2[1], tabThresholdZ, this.params.cutFeed, true),
@@ -297,11 +338,19 @@ class CAMEngine {
           }
         }
 
-        // Retracción obligatoria al terminar el contorno.
-        gcodeLines.push(`G0 Z${fixed3(this.params.safeZ)} ; Retracción segura`);
+        // Retracción obligatoria al terminar el contorno (no aplica en modo 2D).
+        if (!twoD) {
+          gcodeLines.push(`G0 Z${fixed3(this.params.safeZ)} ; ${t('gcode.comment.safeRetract')}`);
+        }
         const last = adjusted[adjusted.length - 1];
         this.toolpaths.push(
-          new ToolpathSegment('G0', last[0], last[1], this.params.safeZ, this.params.rapidFeed),
+          new ToolpathSegment(
+            'G0',
+            last[0],
+            last[1],
+            twoD ? 0.0 : this.params.safeZ,
+            this.params.rapidFeed,
+          ),
         );
       }
     }
@@ -356,9 +405,10 @@ class CAMEngine {
       timeCutSec: Math.round(timeCut * 10) / 10,
       timeTotalSec: Math.round(timeTotal * 10) / 10,
       timeTotalMin: Math.round((timeTotal / 60.0) * 100) / 100,
-      zMin: this.params.targetDepth,
+      zMin: this.params.twoDMode ? 0 : this.params.targetDepth,
       safeZ: this.params.safeZ,
-      numPasses: this.calculateZPasses().length,
+      numPasses: this.params.twoDMode ? 1 : this.calculateZPasses().length,
+      twoDMode: Boolean(this.params.twoDMode),
     };
   }
 

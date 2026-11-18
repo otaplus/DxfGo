@@ -184,7 +184,9 @@
         this.running = false;
         this.paused = false;
         this._emitState();
-        this.telemetry.textContent = `Simulación finalizada | T: ${this.totalTime.toFixed(1)}s`;
+        this.telemetry.textContent = window.I18n.t('sim.finished', {
+          time: this.totalTime.toFixed(1),
+        });
         return;
       }
 
@@ -222,14 +224,28 @@
 
     updateTelemetry() {
       if (!this.telemetry) return;
+      const t = window.I18n.t;
       if (this.stepIndex > 0 && this.commands[this.stepIndex - 1]) {
         const command = this.commands[this.stepIndex - 1];
-        this.telemetry.textContent = `X: ${command.x.toFixed(3)} | Y: ${command.y.toFixed(3)} | `
-          + `Z: ${command.z.toFixed(3)} | Paso: ${this.stepIndex}/${this.commands.length} | `
-          + `T: ${this.currentTime.toFixed(1)}s / ${this.totalTime.toFixed(1)}s`;
+        this.telemetry.textContent = t('sim.telemetry', {
+          x: command.x.toFixed(3),
+          y: command.y.toFixed(3),
+          z: command.z.toFixed(3),
+          step: this.stepIndex,
+          total: this.commands.length,
+          time: this.currentTime.toFixed(1),
+          totalTime: this.totalTime.toFixed(1),
+        });
       } else {
-        this.telemetry.textContent = `X: 0.000 | Y: 0.000 | Z: 0.000 | Paso: 0/${this.commands.length} | `
-          + `T: 0.0s / ${this.totalTime.toFixed(1)}s`;
+        this.telemetry.textContent = t('sim.telemetry', {
+          x: '0.000',
+          y: '0.000',
+          z: '0.000',
+          step: 0,
+          total: this.commands.length,
+          time: '0.0',
+          totalTime: this.totalTime.toFixed(1),
+        });
       }
     }
 

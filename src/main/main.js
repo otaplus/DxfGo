@@ -18,9 +18,15 @@ const { GeometryProcessor } = require('../shared/geometry');
 const { CAMEngine, CAMParameters } = require('../shared/cam-engine');
 const { SafetyChecker } = require('../shared/safety-check');
 const {
-  OPERATIONS, OPERATION_LABELS, OPERATION_DESCRIPTIONS, DEFAULT_PARAMS,
-  NUMBER_LIMITS, POST_PROFILES, ZERO_MODES,
+  DEFAULT_MODAL_CODES, sanitizeModalCodes, injectModalCodes,
+} = require('../shared/gcode-injector');
+const {
+  OPERATIONS, DEFAULT_PARAMS, NUMBER_LIMITS, POST_PROFILES, ZERO_MODES,
 } = require('../shared/constants');
+const {
+  DEFAULT_LANGUAGE, loadLocales, translate,
+} = require('../shared/locales');
+const { Settings } = require('./settings');
 const { buildMenu } = require('./menu');
 
 /** @type {BrowserWindow|null} */
@@ -37,7 +43,92 @@ const state = {
   sim: null,
   stats: null,
   currentFile: '',
+  language: DEFAULT_LANGUAGE,
+  languages: [],
+  messages: {},
+  settings: null,
 };
+
+/**
+ * Traduce una clave al idioma activo.
+ * @param {string} key
+ * @param {Object<string, unknown>} [vars]
+ * @returns {string}
+ */
+function t(key, vars) {
+  return translate(state.language, key, vars, state.messages);
+}
+
+/**
+ * Catálogos de la interfaz traducidos (operaciones, descripciones y ceros).
+ */
+function localizedCatalogs() {
+  const operationLabels = {};
+  const operationDescriptions = {};
+  for (const operation of OPERATIONS) {
+    operationLabels[operation] = t(`operation.${operation}`);
+    operationDescriptions[operation] = t(`operationDesc.${operation}`);
+  }
+  return {
+    operationLabels,
+    operationDescriptions,
+    zeroModes: ZERO_MODES.map((mode) => ({
+      value: mode.value,
+      label: t(`zero.${mode.value}`),
+    })),
+  };
+}
+
+/** Lista de idiomas sin los diccionarios (para el menú y el renderer). */
+function languageList() {
+  return state.languages.map(({ code, name }) => ({ code, name }));
+}
+
+/** Payload que recibe el renderer al cambiar de idioma. */
+function languagePayload() {
+  return {
+    language: state.language,
+    messages: state.messages,
+    languages: languageList(),
+    ...localizedCatalogs(),
+  };
+}
+
+/** Reconstruye el menú nativo en el idioma activo. */
+function applyMenu() {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const menu = buildMenu(mainWindow, {
+    language: state.language,
+    languages: languageList(),
+    t,
+    onSelectLanguage: (code) => applyLanguage(code),
+  });
+  Menu.setApplicationMenu(menu);
+}
+
+/**
+ * Activa un idioma: actualiza estado, preferencias, menú y renderer.
+ * @param {string} code
+ * @param {{persist?: boolean}} [options]
+ */
+function applyLanguage(code, options = {}) {
+  const found = state.languages.find((language) => language.code === code);
+  state.language = found ? code : DEFAULT_LANGUAGE;
+  state.messages = found && found.messages
+    ? found.messages
+    : (state.languages.find((language) => language.code === DEFAULT_LANGUAGE) || {}).messages || {};
+
+  if (options.persist !== false && state.settings) state.settings.set('language', state.language);
+
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.setTitle(t('app.windowTitle'));
+  applyMenu();
+
+  const payload = languagePayload();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('language:changed', payload);
+  }
+  return payload;
+}
 
 // ---------------------------------------------------------------------------
 // Utilidades
@@ -83,6 +174,10 @@ function sanitizeParams(raw = {}) {
   base.tabsEnabled = raw.tabsEnabled !== false;
   base.tabCount = Math.round(base.tabCount);
   base.spindleRpm = Math.round(base.spindleRpm);
+  // Modo 2D: se ignoran las pestañas porque requieren mover el eje Z.
+  base.twoDMode = raw.twoDMode === true;
+  if (base.twoDMode) base.tabsEnabled = false;
+  base.modalCodes = sanitizeModalCodes(raw.modalCodes);
 
   base.workZero = ZERO_MODES.some((mode) => mode.value === raw.workZero)
     ? raw.workZero : base.workZero;
@@ -126,7 +221,7 @@ function emptyBounds() {
 /** Offset del cero pieza para los parámetros actuales. */
 function currentZero() {
   const bounds = state.payload ? state.payload.bounds : emptyBounds();
-  const engine = new CAMEngine(state.params);
+  const engine = new CAMEngine(state.params, t);
   return engine.getZeroOffset(bounds);
 }
 
@@ -161,7 +256,7 @@ function buildPreview() {
       }
     }
 
-    if (params.tabsEnabled && contour.isClosed && contour.nestingLevel === 0) {
+    if (params.tabsEnabled && !params.twoDMode && contour.isClosed && contour.nestingLevel === 0) {
       const intervals = gp.generateTabs(contour.points, params.tabCount, params.tabWidth);
       if (intervals.length) {
         let cumulative = 0;
@@ -206,8 +301,7 @@ function loadDxf(filePath) {
   if (!ok) {
     return {
       ok: false,
-      error: 'El archivo DXF no contiene entidades 2D procesables '
-        + '(LINE, ARC, CIRCLE, LWPOLYLINE, POLYLINE, SPLINE o ELLIPSE).',
+      error: t('error.dxfEntities'),
     };
   }
 
@@ -245,30 +339,38 @@ function registerIpc() {
     platform: process.platform,
     examplesDir: examplesDir(),
     hasExample: fs.existsSync(exampleDxf()),
+    // Idioma activo y diccionario ya resuelto para el renderer.
+    language: state.language,
+    languages: languageList(),
+    messages: state.messages,
     // Catálogos y valores por defecto: el renderer no duplica estas constantes.
     defaults: { ...DEFAULT_PARAMS },
+    defaultModalCodes: { ...DEFAULT_MODAL_CODES },
     operations: OPERATIONS,
-    operationLabels: OPERATION_LABELS,
-    operationDescriptions: OPERATION_DESCRIPTIONS,
     postProfiles: POST_PROFILES,
-    zeroModes: ZERO_MODES,
     numberLimits: NUMBER_LIMITS,
+    ...localizedCatalogs(),
   }));
+
+  ipcMain.handle('language:set', (_event, code) => {
+    const payload = applyLanguage(code);
+    return { ok: true, ...payload };
+  });
 
   ipcMain.handle('dxf:open', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
-      title: 'Seleccionar archivo DXF',
+      title: t('dialog.openTitle'),
       properties: ['openFile'],
       filters: [
-        { name: 'Archivos DXF', extensions: ['dxf'] },
-        { name: 'Todos los archivos', extensions: ['*'] },
+        { name: t('dialog.filterDxf'), extensions: ['dxf'] },
+        { name: t('dialog.filterAll'), extensions: ['*'] },
       ],
     });
     if (result.canceled || !result.filePaths.length) return { ok: false, canceled: true };
     try {
       return loadDxf(result.filePaths[0]);
     } catch (error) {
-      return { ok: false, error: `No se pudo cargar el archivo DXF:\n${error.message}` };
+      return { ok: false, error: t('error.dxfOpen', { message: error.message }) };
     }
   });
 
@@ -276,27 +378,27 @@ function registerIpc() {
     try {
       return loadDxf(filePath);
     } catch (error) {
-      return { ok: false, error: `No se pudo cargar el archivo DXF:\n${error.message}` };
+      return { ok: false, error: t('error.dxfOpen', { message: error.message }) };
     }
   });
 
   ipcMain.handle('dxf:reload', () => {
-    if (!state.currentFile) return { ok: false, error: 'No hay ningún DXF cargado.' };
+    if (!state.currentFile) return { ok: false, error: t('error.dxfReloadNone') };
     try {
       return loadDxf(state.currentFile);
     } catch (error) {
-      return { ok: false, error: `No se pudo recargar el archivo DXF:\n${error.message}` };
+      return { ok: false, error: t('error.dxfReload', { message: error.message }) };
     }
   });
 
   ipcMain.handle('dxf:example', () => {
     if (!fs.existsSync(exampleDxf())) {
-      return { ok: false, error: 'El archivo de ejemplo no está disponible.' };
+      return { ok: false, error: t('error.exampleMissing') };
     }
     try {
       return loadDxf(exampleDxf());
     } catch (error) {
-      return { ok: false, error: `No se pudo cargar el ejemplo:\n${error.message}` };
+      return { ok: false, error: t('error.exampleLoad', { message: error.message }) };
     }
   });
 
@@ -309,11 +411,11 @@ function registerIpc() {
   ipcMain.handle('cam:generate', (_event, request) => {
     applyRequest(request);
     if (!state.payload) {
-      return { ok: false, error: 'Cargue primero un archivo DXF.' };
+      return { ok: false, error: t('error.noDxf') };
     }
 
     try {
-      const engine = new CAMEngine(state.params);
+      const engine = new CAMEngine(state.params, t);
       const gcode = engine.generateGcode(
         state.payload.entities,
         state.payload.bounds,
@@ -321,7 +423,7 @@ function registerIpc() {
       );
 
       if (gcode.startsWith('; Error:')) {
-        return { ok: false, error: 'No hay entidades activas o capas visibles para mecanizar.' };
+        return { ok: false, error: t('error.noEntities') };
       }
 
       const safety = SafetyChecker.verifyGcode(
@@ -329,17 +431,22 @@ function registerIpc() {
         state.params.safeZ,
         state.params.targetDepth,
         state.params.plungeFeed,
+        { twoDMode: state.params.twoDMode, t },
       );
-      const sim = engine.buildSimulation(gcode);
 
-      state.gcode = gcode;
+      // Los códigos modales del usuario se insertan después de verificar la
+      // seguridad, para que sus fragmentos no alteren el análisis de movimiento.
+      const finalGcode = injectModalCodes(gcode, state.params.modalCodes);
+      const sim = engine.buildSimulation(finalGcode);
+
+      state.gcode = finalGcode;
       state.safety = safety;
       state.stats = engine.stats;
       state.sim = sim;
 
       return {
         ok: true,
-        gcode,
+        gcode: finalGcode,
         stats: engine.stats,
         safety,
         sim,
@@ -347,28 +454,28 @@ function registerIpc() {
         zero: currentZero(),
       };
     } catch (error) {
-      return { ok: false, error: `No se pudo generar el código G:\n${error.message}` };
+      return { ok: false, error: t('error.generate', { message: error.message }) };
     }
   });
 
   ipcMain.handle('file:save-gcode', async (_event, content) => {
-    if (!content) return { ok: false, error: 'Genere primero el código G antes de guardar.' };
+    if (!content) return { ok: false, error: t('error.saveNoGcode') };
 
     const suggested = state.currentFile
       ? `${path.basename(state.currentFile, path.extname(state.currentFile))}.nc`
-      : 'programa.nc';
+      : t('file.programName');
 
     const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'Guardar archivo G-Code',
+      title: t('dialog.saveTitle'),
       defaultPath: state.currentFile
         ? path.join(path.dirname(state.currentFile), suggested)
         : path.join(app.getPath('documents'), suggested),
       filters: [
-        { name: 'Archivos NC (*.nc)', extensions: ['nc'] },
-        { name: 'Archivos G-Code (*.gcode)', extensions: ['gcode'] },
-        { name: 'Archivos TAP (*.tap)', extensions: ['tap'] },
-        { name: 'Archivos de texto (*.txt)', extensions: ['txt'] },
-        { name: 'Todos los archivos', extensions: ['*'] },
+        { name: t('dialog.saveFilterNc'), extensions: ['nc'] },
+        { name: t('dialog.saveFilterGcode'), extensions: ['gcode'] },
+        { name: t('dialog.saveFilterTap'), extensions: ['tap'] },
+        { name: t('dialog.saveFilterTxt'), extensions: ['txt'] },
+        { name: t('dialog.filterAll'), extensions: ['*'] },
       ],
     });
     if (result.canceled || !result.filePath) return { ok: false, canceled: true };
@@ -377,17 +484,17 @@ function registerIpc() {
       fs.writeFileSync(result.filePath, content, 'utf8');
       return { ok: true, filePath: result.filePath };
     } catch (error) {
-      return { ok: false, error: `No se pudo guardar el archivo:\n${error.message}` };
+      return { ok: false, error: t('error.save', { message: error.message }) };
     }
   });
 
   ipcMain.handle('file:export-report', async (_event, reportText) => {
-    if (!reportText) return { ok: false, error: 'Genere primero el código G.' };
+    if (!reportText) return { ok: false, error: t('error.exportNoGcode') };
 
     const result = await dialog.showSaveDialog(mainWindow, {
-      title: 'Exportar informe de seguridad',
-      defaultPath: 'informe_seguridad.txt',
-      filters: [{ name: 'Texto (*.txt)', extensions: ['txt'] }],
+      title: t('dialog.reportTitle'),
+      defaultPath: t('file.reportName'),
+      filters: [{ name: t('dialog.reportFilter'), extensions: ['txt'] }],
     });
     if (result.canceled || !result.filePath) return { ok: false, canceled: true };
 
@@ -395,7 +502,7 @@ function registerIpc() {
       fs.writeFileSync(result.filePath, reportText, 'utf8');
       return { ok: true, filePath: result.filePath };
     } catch (error) {
-      return { ok: false, error: error.message };
+      return { ok: false, error: `${t('error.export')}\n${error.message}` };
     }
   });
 
@@ -404,15 +511,30 @@ function registerIpc() {
     return { ok: true };
   });
 
-  ipcMain.handle('shell:open-examples', () => {
+  ipcMain.handle('shell:open-examples', async () => {
     const dir = examplesDir();
     try {
-      if (fs.existsSync(exampleDxf())) {
-        shell.showItemInFolder(exampleDxf());
-        return { ok: true };
+      // En desarrollo los ejemplos están en disco y basta con mostrarlos.
+      if (!app.isPackaged) {
+        if (fs.existsSync(exampleDxf())) {
+          shell.showItemInFolder(exampleDxf());
+          return { ok: true };
+        }
+        const error = await shell.openPath(dir);
+        return error ? { ok: false, error } : { ok: true };
       }
-      shell.openPath(dir);
-      return { ok: true };
+
+      // Empaquetada, la carpeta de ejemplos vive dentro de app.asar (solo
+      // lectura), así que se copia a Documentos para poder abrirla con el
+      // explorador del sistema.
+      const target = path.join(app.getPath('documents'), 'CAD-CAM 2D CNC', 'Ejemplos');
+      fs.mkdirSync(target, { recursive: true });
+      for (const name of fs.readdirSync(dir)) {
+        fs.copyFileSync(path.join(dir, name), path.join(target, name));
+      }
+      const error = await shell.openPath(target);
+      if (error) return { ok: false, error };
+      return { ok: true, dir: target };
     } catch (error) {
       return { ok: false, error: error.message };
     }
@@ -430,7 +552,7 @@ function createWindow() {
     minWidth: 1024,
     minHeight: 700,
     backgroundColor: '#1e1e1e',
-    title: 'CAD-CAM 2D CNC - Generador de Trayectorias Seguras',
+    title: t('app.windowTitle'),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
@@ -505,8 +627,7 @@ function createWindow() {
     return { action: 'deny' };
   });
 
-  const menu = buildMenu(mainWindow);
-  Menu.setApplicationMenu(menu);
+  applyMenu();
 }
 
 // ---------------------------------------------------------------------------
@@ -525,6 +646,19 @@ if (!app.requestSingleInstanceLock()) {
 
   app.whenReady().then(() => {
     if (process.platform === 'win32') app.setAppUserModelId('com.dxf2gcode.cadcam');
+
+    // Idioma: se leen los archivos de locales/ y la preferencia guardada.
+    state.settings = new Settings(path.join(app.getPath('userData'), 'settings.json'));
+    state.languages = loadLocales(app.getAppPath());
+    if (!state.languages.length) {
+      state.languages = [{ code: DEFAULT_LANGUAGE, name: 'Español', messages: {} }];
+    }
+    const savedLanguage = state.settings.get('language', DEFAULT_LANGUAGE);
+    state.language = state.languages.some((language) => language.code === savedLanguage)
+      ? savedLanguage : DEFAULT_LANGUAGE;
+    state.messages = (state.languages.find((language) => language.code === state.language)
+      || {}).messages || {};
+
     registerIpc();
     createWindow();
 
