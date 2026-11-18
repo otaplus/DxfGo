@@ -1,0 +1,93 @@
+{
+  "name": "dxf2gcode",
+  "productName": "CAD-CAM 2D CNC",
+  "version": "3.0.0",
+  "description": "Suite CAD-CAM multiplataforma para importar DXF y generar codigo G con trayectorias seguras para CNC 2D / 2.5D",
+  "main": "src/main/main.js",
+  "author": "dxf2gcode",
+  "license": "MIT",
+  "private": true,
+  "keywords": [
+    "cad",
+    "cam",
+    "cnc",
+    "dxf",
+    "gcode",
+    "grbl",
+    "mach3",
+    "linuxcnc",
+    "electron"
+  ],
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "postinstall": "node scripts/ensure-electron.js",
+    "setup:electron": "node scripts/ensure-electron.js",
+    "preview:ui": "node scripts/build-preview.js",
+    "test": "node tests/run-tests.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "dependencies": {
+    "clipper-lib": "^6.4.2",
+    "dxf-parser": "^1.1.2"
+  },
+  "devDependencies": {
+    "electron": "^45.3.4",
+    "electron-builder": "^26.18.0",
+    "jsdom": "^31.0.1"
+  },
+  "build": {
+    "appId": "com.dxf2gcode.cadcam",
+    "productName": "CAD-CAM 2D CNC",
+    "copyright": "Copyright (c) dxf2gcode",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "examples/**/*",
+      "package.json",
+      "!**/*.map"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "CAD-CAM 2D CNC"
+    },
+    "mac": {
+      "category": "public.app-category.graphics-design",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "category": "Graphics",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
+    }
+  }
+}

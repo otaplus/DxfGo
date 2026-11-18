@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CAD-CAM 2D CNC - Generador de Trayectorias Seguras</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- ================= PANEL IZQUIERDO ================= -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-scroll">
+
+        <section class="panel">
+          <h2 class="panel-title">1. Archivo DXF</h2>
+          <div class="btn-row">
+            <button class="btn btn-primary grow" id="btnOpen">📂 Abrir DXF...</button>
+            <button class="btn" id="btnReload" title="Volver a leer el archivo actual">🔄</button>
+          </div>
+          <p class="hint-text" id="fileInfo">Ningún archivo cargado</p>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">2. Capas y Operaciones CAM</h2>
+          <p class="hint-text">Asigna operaciones de mecanizado por capa:</p>
+          <div id="layerList" class="layer-list">
+            <p class="hint-text">Sin capas cargadas.</p>
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">3. Herramienta y Seguridad Z</h2>
+
+          <div class="row">
+            <label for="toolDiameter">Diámetro fresa (mm)</label>
+            <input type="number" id="toolDiameter" step="0.001" min="0.05" max="100" list="diameterPresets" />
+            <datalist id="diameterPresets">
+              <option value="1.5"></option>
+              <option value="2"></option>
+              <option value="3"></option>
+              <option value="3.175"></option>
+              <option value="4"></option>
+              <option value="6"></option>
+              <option value="6.35"></option>
+              <option value="8"></option>
+            </datalist>
+          </div>
+
+          <div class="row">
+            <label for="safeZ">Z seguro (G0) (mm)</label>
+            <input type="number" id="safeZ" step="0.1" min="0" max="500" />
+          </div>
+
+          <div class="row">
+            <label for="retractZ">Z aproximación (mm)</label>
+            <input type="number" id="retractZ" step="0.1" min="-100" max="500" />
+          </div>
+
+          <div class="row">
+            <label for="targetDepth">Profundidad total (mm)</label>
+            <input type="number" id="targetDepth" step="0.1" min="-500" max="0" />
+          </div>
+
+          <div class="row">
+            <label for="stepdown">Paso por pasada (mm)</label>
+            <input type="number" id="stepdown" step="0.1" min="0.01" max="500" />
+          </div>
+
+          <p class="passes-info" id="passesInfo">Cálculo: 2 pasadas en Z</p>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">4. Avances y Husillo</h2>
+
+          <div class="row">
+            <label for="cutFeed">Avance corte XY (mm/min)</label>
+            <input type="number" id="cutFeed" step="10" min="1" max="60000" />
+          </div>
+
+          <div class="row">
+            <label for="plungeFeed">Avance penetración Z (mm/min)</label>
+            <input type="number" id="plungeFeed" step="10" min="1" max="60000" />
+          </div>
+
+          <div class="row">
+            <label for="spindleRpm">Velocidad husillo (RPM)</label>
+            <input type="number" id="spindleRpm" step="100" min="0" max="100000" />
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">5. Pestañas de Sujeción</h2>
+
+          <label class="check">
+            <input type="checkbox" id="tabsEnabled" />
+            <span>Activar pestañas de fijación de pieza</span>
+          </label>
+
+          <div class="row">
+            <label for="tabCount">Cantidad de pestañas</label>
+            <input type="number" id="tabCount" step="1" min="1" max="12" />
+          </div>
+
+          <div class="row">
+            <label for="tabWidth">Ancho de pestaña (mm)</label>
+            <input type="number" id="tabWidth" step="0.1" min="0.5" max="200" />
+          </div>
+
+          <div class="row">
+            <label for="tabHeight">Altura sobre fondo (mm)</label>
+            <input type="number" id="tabHeight" step="0.1" min="0.1" max="100" />
+          </div>
+        </section>
+
+        <section class="panel">
+          <h2 class="panel-title">6. Cero Pieza y Postprocesador</h2>
+
+          <div class="row">
+            <label for="workZero">Cero de trabajo</label>
+            <select id="workZero"></select>
+          </div>
+
+          <div class="row">
+            <label for="postProfile">Controlador CNC</label>
+            <select id="postProfile"></select>
+          </div>
+        </section>
+
+      </div>
+
+      <div class="actions">
+        <button class="btn btn-generate" id="btnGenerate">🚀 GENERAR G-CODE SEGURO</button>
+        <button class="btn btn-save" id="btnSaveGcode">💾 Guardar Programa CNC...</button>
+        <button class="btn btn-safety" id="btnSafety">🛡 Informe de Seguridad</button>
+      </div>
+    </aside>
+
+    <!-- ================= ÁREA DE TRABAJO ================= -->
+    <main class="workspace">
+      <nav class="tabs" id="tabs">
+        <button class="tab active" data-tab="cad">📐 Visor CAD / CAM</button>
+        <button class="tab" data-tab="gcode">📝 Código G Generado</button>
+        <button class="tab" data-tab="sim">🎮 Simulador CNC 2D</button>
+      </nav>
+
+      <!-- Visor CAD -->
+      <section class="tab-panel active" id="panel-cad">
+        <div class="toolbar">
+          <button class="btn small" id="cadZoomIn" title="Acercar">🔍+</button>
+          <button class="btn small" id="cadZoomOut" title="Alejar">🔍-</button>
+          <button class="btn small" id="cadFit" title="Ajustar vista">🏠 Ajustar vista</button>
+          <label class="check inline">
+            <input type="checkbox" id="showToolpaths" checked />
+            <span>Mostrar trayectorias compensadas</span>
+          </label>
+          <span class="coords" id="cadCoords">X: 0.000 mm | Y: 0.000 mm</span>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="cadCanvas"></canvas>
+          <div class="canvas-hint" id="cadHint">Haz clic en «Abrir DXF...» para cargar una pieza.</div>
+        </div>
+      </section>
+
+      <!-- Código G -->
+      <section class="tab-panel" id="panel-gcode">
+        <div class="toolbar">
+          <span class="stats" id="gcodeStats">Genere el código G para visualizar estadísticas.</span>
+          <button class="btn small" id="btnCopyGcode">📋 Copiar</button>
+          <button class="btn small" id="btnSaveGcode2">💾 Guardar como...</button>
+        </div>
+        <div class="gcode-wrap">
+          <textarea id="gcodeText" class="gcode-text" readonly spellcheck="false"
+                    placeholder="Aún no se ha generado ningún programa."></textarea>
+        </div>
+      </section>
+
+      <!-- Simulador -->
+      <section class="tab-panel" id="panel-sim">
+        <div class="toolbar">
+          <div class="sim-buttons">
+            <button class="btn small" id="simStart">▶ Iniciar</button>
+            <button class="btn small" id="simPause">⏸ Pausar</button>
+            <button class="btn small" id="simStop">⏹ Detener</button>
+            <button class="btn small" id="simStep">⏭ Paso</button>
+            <button class="btn small" id="simReset">⟳ Reiniciar</button>
+          </div>
+          <label class="speed">
+            Velocidad
+            <input type="number" id="simSpeed" min="1" max="50" step="1" value="5" />
+          </label>
+          <label class="scrub">
+            Avance
+            <input type="range" id="simProgress" min="0" max="100" step="0.1" value="0" />
+          </label>
+        </div>
+        <div class="sim-telemetry">
+          <span id="simTelemetry">X: 0.000 | Y: 0.000 | Z: 0.000 | T: 0.0s</span>
+        </div>
+        <div class="sim-body">
+          <div class="canvas-wrap">
+            <canvas id="simCanvas"></canvas>
+            <div class="canvas-hint" id="simHint">Genere el código G para inicializar el simulador.</div>
+          </div>
+          <div class="code-panel">
+            <h3>Bloques G-Code en ejecución</h3>
+            <div class="code-list" id="simCodeList"></div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- ================= BARRA DE ESTADO ================= -->
+  <footer class="statusbar">
+    <span id="statusText">Listo. Abra un archivo DXF para comenzar.</span>
+    <span class="badge" id="safetyBadge" data-status="none">Seguridad: sin calcular</span>
+  </footer>
+
+  <!-- Avisos flotantes -->
+  <div class="toast-stack" id="toasts"></div>
+
+  <!-- Diálogo modal -->
+  <div class="modal-backdrop hidden" id="modal">
+    <div class="modal">
+      <header>
+        <h2 id="modalTitle">Título</h2>
+        <button class="btn icon" id="modalClose" aria-label="Cerrar">✕</button>
+      </header>
+      <div class="modal-body" id="modalBody"></div>
+      <footer>
+        <button class="btn" id="modalOk">Cerrar</button>
+      </footer>
+    </div>
+  </div>
+
+  <script src="util.js"></script>
+  <script src="cad-view.js"></script>
+  <script src="sim-view.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

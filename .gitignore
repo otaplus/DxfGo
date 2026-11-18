@@ -1,0 +1,22 @@
+# Dependencias
+node_modules/
+
+# Artefactos de empaquetado
+release/
+dist/
+out/
+
+# Cachés de desarrollo y pruebas
+.cache/
+*.log
+
+# Sistema operativo / editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# Python heredado (por si quedara algún resto)
+__pycache__/
+*.pyc

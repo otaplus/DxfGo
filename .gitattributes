@@ -1,0 +1,9 @@
+﻿# Normalización de finales de línea para un proyecto multiplataforma
+* text=auto
+*.js text eol=lf
+*.json text eol=lf
+*.html text eol=lf
+*.css text eol=lf
+*.md text eol=lf
+*.png binary
+*.ico binary
